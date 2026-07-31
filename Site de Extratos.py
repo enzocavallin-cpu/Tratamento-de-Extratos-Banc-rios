@@ -308,7 +308,7 @@ def bb_cc(output_pdf):
                         "Valor": match.group(5),
                         "Natureza": match.group(6)
                     })
-            elife len(matches_two) > 0:
+            elif len(matches_two) > 0:
                 for match in matches_two:
                     data.append({
                         'Data': match.group(1),
