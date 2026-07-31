@@ -296,7 +296,7 @@ def bb_cc(output_pdf):
             
             matches_one = list(re.finditer(pattern_one, clean_text))
             matches_two = list(re.finditer(pattern_two, clean_inverted_text))
-            matches_three = list(re.finditer(pattern_two, clean__text))
+            matches_three = list(re.finditer(pattern_two, clean_text))
             
             if len(matches_one) > 0:
                 for match in matches_one:
