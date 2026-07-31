@@ -641,6 +641,11 @@ if st.session_state.step == 2:
                     account = bb_if(output_pdf)
                 
                 final_extract(account)
+
+            elif second_choice == 'Caixa Econômica Federal' and thrid_choice == 'Fundo de Investimento:
+                with st.spinner("Extraindo e normalizando dados do extrato..."):
+                    output_pdf = unite_pdfs(extract_files)
+                    account = ce_if(output_pdf)
             
             nome_base = st.text_input("Digite o nome para o arquivo final (sem extensão):", value="extrato_bb_cc_tratado")
             
