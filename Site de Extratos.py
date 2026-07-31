@@ -646,6 +646,8 @@ if st.session_state.step == 2:
                 with st.spinner("Extraindo e normalizando dados do extrato..."):
                     output_pdf = unite_pdfs(extract_files)
                     account = ce_if(output_pdf)
+
+                final_extract(account)
             
             nome_base = st.text_input("Digite o nome para o arquivo final (sem extensão):", value="extrato_bb_cc_tratado")
             
