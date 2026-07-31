@@ -518,7 +518,7 @@ def ce_if(output_pdf):
                         "Natureza": match.group(4)
                     })
 
-investment_fund = pd.DataFrame(data)
+    investment_fund = pd.DataFrame(data)
     
 #-----------------------------------------------------------------------------
 # Function to Exhibit DataFrame and Download Options:
