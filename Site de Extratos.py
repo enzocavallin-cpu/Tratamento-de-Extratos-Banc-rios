@@ -490,6 +490,8 @@ def bb_if(output_pdf):
 # Function to Create BB_IF from united pdf:
 #-----------------------------------------------------------------------------
 def ce_if(output_pdf):
+    import pdfplumber
+    
     pattern = (
     r'(\d{2}\s*\/\s*\d{2})\s+'
     r'([A-Za-zÀ-ÿ0-9\s\-\.\/\?]+?)\s+'
