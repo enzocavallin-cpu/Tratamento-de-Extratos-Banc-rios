@@ -490,7 +490,6 @@ def bb_if(output_pdf):
 # Function to Create BB_IF from united pdf:
 #-----------------------------------------------------------------------------
 def ce_if(output_pdf):
-    import pdfplumber
     
     pattern = (
     r'(\d{2}\s*\/\s*\d{2})\s+'
@@ -499,25 +498,25 @@ def ce_if(output_pdf):
     r'(D|C)'
     )
 
-data = []
-full_text = ""
-
-with pdfplumber.open(output_pdf) as pdf:
-    for page in pdf.pages:
-        page_text = page.extract_text()
-        if page_text:
-            full_text += page_text + "\n"
-        
-        matches_one = list(re.finditer(pattern, full_text))
-        
-        if matches_one:
-            for match in matches_one:
-                data.append({
-                    "Data": match.group(1),
-                    "Descrição": match.group(2).strip(),
-                    "Valor": match.group(3),
-                    "Natureza": match.group(4)
-                })
+    data = []
+    full_text = ""
+    
+    with pdfplumber.open(output_pdf) as pdf:
+        for page in pdf.pages:
+            page_text = page.extract_text()
+            if page_text:
+                full_text += page_text + "\n"
+            
+            matches_one = list(re.finditer(pattern, full_text))
+            
+            if matches_one:
+                for match in matches_one:
+                    data.append({
+                        "Data": match.group(1),
+                        "Descrição": match.group(2).strip(),
+                        "Valor": match.group(3),
+                        "Natureza": match.group(4)
+                    })
 
 investment_fund = pd.DataFrame(data)
     
