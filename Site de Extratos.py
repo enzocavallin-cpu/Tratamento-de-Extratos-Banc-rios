@@ -8,6 +8,7 @@ import re
 import pdfplumber
 import pandas as pd
 import numpy as np
+import hashlib
 
 #-----------------------------------------------------------------------------
 # Function to Unite PDFs:
@@ -487,7 +488,7 @@ def bb_if(output_pdf):
     return investment_fund
 
 #-----------------------------------------------------------------------------
-# Function to Create BB_IF from united pdf:
+# Function to Create CE_IF from united pdf:
 #-----------------------------------------------------------------------------
 def ce_if(output_pdf):
     
