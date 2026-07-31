@@ -295,6 +295,8 @@ def bb_cc(output_pdf):
             clean_inverted_text = ' '.join(inverted_lines)
             
             matches_one = list(re.finditer(pattern_one, clean_text))
+            matches_two = list(re.finditer(pattern_two, clean_inverted_text)
+            matches_three = list(re.finditer(pattern_two, clean__text)
             
             if len(matches_one) > 0:
                 for match in matches_one:
@@ -306,10 +308,8 @@ def bb_cc(output_pdf):
                         "Valor": match.group(5),
                         "Natureza": match.group(6)
                     })
-            elif:
-                matches_two = re.finditer(pattern_two, clean_inverted_text)
+            elife len(matches_two) > 0:
                 for match in matches_two:
-                    
                     data.append({
                         'Data': match.group(1),
                         'Codigo': match.group(3) if match.group(3) else "",
@@ -318,6 +318,16 @@ def bb_cc(output_pdf):
                         'Valor': match.group(5),
                         'Natureza': match.group(6),
                     })
+            else:
+                for match in matches_three:
+                    data.append({
+                                    'Data': match.group(1),
+                                    'Codigo': match.group(3) if match.group(3) else "",
+                                    'Descrição': match.group(2).strip(),
+                                    'Documento': match.group(4) if match.group(4) else "",
+                                    'Valor': match.group(5),
+                                    'Natureza': match.group(6),
+                                })
                         
     checking_account = pd.DataFrame(data)
     checking_account = checking_account.apply(adjust_description, axis=1)
