@@ -195,7 +195,9 @@ def normalize_columns(extract):
         "Saldo Atual": "Saldo Final",
         "SALDO ATUAL": "Saldo Final",
         "SALDO ANTERIOR": "Saldo Anterior",
-        "Reajuste Monetrio BACEN": "Reajuste Monetário"
+        "Reajuste Monetrio BACEN": "Reajuste Monetário",
+        "APLICACAO": "Aplicação",
+        "": ""
     }
     
     extract['Descrição'] = (
@@ -205,6 +207,7 @@ def normalize_columns(extract):
     )
     
     extract['Data'] = extract['Data'].str.replace('.', '/', regex=False)
+    extract['Data'] = extract['Data'].str.replace(' ', '', regex=False)
     
     extract['Descrição'] = extract['Descrição'].map(normalization_dic).fillna(extract['Descrição'])
     
@@ -267,7 +270,7 @@ def bb_cc(output_pdf):
     )
 
     pattern_two = (
-    r'(\d{2}\.\d{2}\.\d{4})\s+'
+    r'(\d{2}[./]\d{2}[./]\d{4})\s+'
     r'([A-Za-zÀ-ÿ0-9\s\-\.\/\?]+?)\s+'
     r'(?:(\d{1,20})\s+)?'
     r'(?:(\d{1,20})\s+)?'
@@ -303,7 +306,7 @@ def bb_cc(output_pdf):
                         "Valor": match.group(5),
                         "Natureza": match.group(6)
                     })
-            else:
+            elif:
                 matches_two = re.finditer(pattern_two, clean_inverted_text)
                 for match in matches_two:
                     
@@ -473,6 +476,39 @@ def bb_if(output_pdf):
     
     return investment_fund
 
+#-----------------------------------------------------------------------------
+# Function to Create BB_IF from united pdf:
+#-----------------------------------------------------------------------------
+def ce_if(output_pdf):
+    pattern = (
+    r'(\d{2}\s*\/\s*\d{2})\s+'
+    r'([A-Za-zÀ-ÿ0-9\s\-\.\/\?]+?)\s+'
+    r'([\d\.]+[\,\.]\d{2})\s*+' 
+    r'(D|C)'
+    )
+
+data = []
+full_text = ""
+
+with pdfplumber.open(output_pdf) as pdf:
+    for page in pdf.pages:
+        page_text = page.extract_text()
+        if page_text:
+            full_text += page_text + "\n"
+        
+        matches_one = list(re.finditer(pattern, full_text))
+        
+        if matches_one:
+            for match in matches_one:
+                data.append({
+                    "Data": match.group(1),
+                    "Descrição": match.group(2).strip(),
+                    "Valor": match.group(3),
+                    "Natureza": match.group(4)
+                })
+
+investment_fund = pd.DataFrame(data)
+    
 #-----------------------------------------------------------------------------
 # Function to Exhibit DataFrame and Download Options:
 #-----------------------------------------------------------------------------
