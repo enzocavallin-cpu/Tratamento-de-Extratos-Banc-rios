@@ -498,6 +498,7 @@ def ce_if(output_pdf):
     r'([\d\.]+[\,\.]\d{2})\s*+' 
     r'(D|C)'
     )
+    pattern_year = r'\s\d{2}(\/\d{4})\s'
 
     data = []
     full_text = ""
@@ -518,14 +519,29 @@ def ce_if(output_pdf):
                         "Valor": match.group(3),
                         "Natureza": match.group(4)
                     })
+                    
+            matches_two = list(re.finditer(pattern_year, full_text))
+            if matches_two:
+                for match in matches_two:
+                    data.append({
+                        "Ano": match.group(1)
+                        })
 
     investment_fund = pd.DataFrame(data)
     
+    investment_fund['Ano'] = investment_fund['Ano'].bfill()
+    investment_fund = investment_fund.dropna(subset=['Descrição'])
+    investment_fund['Data'] = investment_fund['Data'].astype(str).str.replace(' ', '')
+
+    investment_fund['Data'] = pd.to_datetime(investment_fund['Data'].str.replace(' ', ''), format='%d/%m', errors='coerce')
+    investment_fund['Data'] = investment_fund['Data'] + investment_fund['Ano']
+    investment_fund = investment_fund.drop(columns=['Ano'])
+    
     investment_fund['Data'] = pd.to_datetime(
-    investment_fund['Data'].str.replace(' ', '') + '/2026', 
-    format='%d/%m/%Y', 
-    errors='coerce'
-    )
+        investment_fund['Data'].str.replace(' ', '') + '/2026', 
+        format='%d/%m/%Y', 
+        errors='coerce'
+        )
     
     dic_fund = {'APLICACAO': 'Aplicação', 'RESGATE': 'Resgate'}
     
