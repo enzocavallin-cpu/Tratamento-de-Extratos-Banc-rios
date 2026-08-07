@@ -531,17 +531,16 @@ def ce_if(output_pdf):
     
     investment_fund['Ano'] = investment_fund['Ano'].bfill()
     investment_fund = investment_fund.dropna(subset=['Descrição'])
-    investment_fund['Data'] = investment_fund['Data'].astype(str).str.replace(' ', '')
-
-    investment_fund['Data'] = pd.to_datetime(investment_fund['Data'].str.replace(' ', ''), format='%d/%m', errors='coerce')
-    investment_fund['Data'] = investment_fund['Data'] + investment_fund['Ano']
-    investment_fund = investment_fund.drop(columns=['Ano'])
+    investment_fund['Data'] = (
+        investment_fund['Data'].astype(str).str.replace(' ', '') + 
+        investment_fund['Ano'].astype(str).str.strip()
+    )
     
-    investment_fund['Data'] = pd.to_datetime(
-        investment_fund['Data'].str.replace(' ', '') + '/2026', 
-        format='%d/%m/%Y', 
-        errors='coerce'
-        )
+    investment_fund = investment_fund.drop(columns=['Ano'])
+
+    investment_fund['Data'] = pd.to_datetime(investment_fund['Data'].str.replace(' ', ''), format='%d/%m/%Y', errors='coerce')
+    
+    investment_fund = investment_fund.drop(columns=['Ano'])
     
     dic_fund = {'APLICACAO': 'Aplicação', 'RESGATE': 'Resgate'}
     
