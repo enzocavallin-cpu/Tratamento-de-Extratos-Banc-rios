@@ -198,7 +198,7 @@ def normalize_columns(extract):
         "SALDO ANTERIOR": "Saldo Anterior",
         "Reajuste Monetrio BACEN": "Reajuste Monetário",
         "APLICACAO": "Aplicação",
-        "": ""
+        "RESGATE": "Resgate"
     }
     
     extract['Descrição'] = (
