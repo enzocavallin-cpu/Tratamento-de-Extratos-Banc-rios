@@ -542,7 +542,7 @@ def ce_if(output_pdf):
     
     dic_fund = {'APLICACAO': 'Aplicação', 'RESGATE': 'Resgate'}
     
-    investment_fund['Descrição'] = investment_fund['Descrição'].map(dic_fund)
+    investment_fund['Descrição'] = investment_fund['Descrição'].replace(dic_fund)
     
     investment_fund['Valor'] = pd.to_numeric(
         investment_fund['Valor']
