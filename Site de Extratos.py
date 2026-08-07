@@ -64,7 +64,7 @@ def interface_unite_pdfs():
         st.info("Aguardando o upload de arquivos PDF para começar.")
 
 #-----------------------------------------------------------------------------
-# Function to Adjust Description:
+# Function to Calculate Revenue:
 #-----------------------------------------------------------------------------
 def calculate_revenue(row):   
     row = row.sort_values("Data").reset_index(drop=True)
@@ -520,6 +520,18 @@ def ce_if(output_pdf):
                     })
 
     investment_fund = pd.DataFrame(data)
+    
+    investment_fund['Data'] = pd.to_datetime(
+    investment_fund['Data'].str.replace(' ', '') + '/2026', 
+    format='%d/%m/%Y', 
+    errors='coerce'
+    )
+    
+    dic_fund = {'APLICACAO': 'Aplicação', 'RESGATE': 'Resgate'}
+    
+    investment_fund = investment_fund.map(dic_fund)
+    
+    investment_fund = calculate_revenue(investment_fund)
     
     return investment_fund
     
