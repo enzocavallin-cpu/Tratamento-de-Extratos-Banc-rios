@@ -501,16 +501,15 @@ def ce_if(output_pdf):
     pattern_year = r'\s\d{2}(\/\d{4})\s'
 
     data = []
-    full_text = ""
-    
-    with pdfplumber.open(output_pdf) as pdf:
+
+    with pdfplumber.open('C:/Users/enzo.barboza/Downloads/in/EXTRATO APLICAÇÃO 07 2023 2562.pdf') as pdf:
         for page in pdf.pages:
             page_text = page.extract_text()
-            if page_text:
-                full_text += page_text + "\n"
-            
-            matches_one = list(re.finditer(pattern, full_text))
-            
+            if not page_text:
+                continue
+                
+            # Busca apenas no texto extraído DA PÁGINA ATUAL
+            matches_one = list(re.finditer(pattern, page_text))
             if matches_one:
                 for match in matches_one:
                     data.append({
@@ -520,12 +519,13 @@ def ce_if(output_pdf):
                         "Natureza": match.group(4)
                     })
                     
-            matches_two = list(re.finditer(pattern_year, full_text))
+
+            matches_two = list(re.finditer(pattern_year, page_text))
             if matches_two:
                 for match in matches_two:
                     data.append({
                         "Ano": match.group(1)
-                        })
+                    })
 
     investment_fund = pd.DataFrame(data)
     
