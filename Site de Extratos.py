@@ -75,6 +75,9 @@ def calculate_revenue(row):
     row["Val_Resgate"] = np.where(
         row["Descrição"].str.contains("Resgate", na=False), row["Valor"], 0
     )
+    row["Val_Resgate"] = np.where(
+        row["Descrição"].str.contains("RESGATE", na=False), row["Valor"], 0
+    )
 
     row["Ano_Mes"] = row["Data"].dt.to_period("M")
 
