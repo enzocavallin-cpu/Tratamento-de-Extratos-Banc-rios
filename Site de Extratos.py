@@ -538,7 +538,7 @@ def ce_if(output_pdf):
         .str.replace(',', '.', regex=False)
         .str.strip(),
         errors='coerce'
-        ).fullna(0.0)
+        ).fillna(0.0)
     
     investment_fund = calculate_revenue(investment_fund)
     
