@@ -521,6 +521,8 @@ def ce_if(output_pdf):
 
     investment_fund = pd.DataFrame(data)
     
+    return investment_fund
+    
 #-----------------------------------------------------------------------------
 # Function to Exhibit DataFrame and Download Options:
 #-----------------------------------------------------------------------------
