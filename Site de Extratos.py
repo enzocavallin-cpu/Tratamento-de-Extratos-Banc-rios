@@ -540,8 +540,6 @@ def ce_if(output_pdf):
 
     investment_fund['Data'] = pd.to_datetime(investment_fund['Data'].str.replace(' ', ''), format='%d/%m/%Y', errors='coerce')
     
-    investment_fund = investment_fund.drop(columns=['Ano'])
-    
     dic_fund = {'APLICACAO': 'Aplicação', 'RESGATE': 'Resgate'}
     
     investment_fund['Descrição'] = investment_fund['Descrição'].map(dic_fund)
