@@ -531,6 +531,15 @@ def ce_if(output_pdf):
     
     investment_fund['Descrição'] = investment_fund['Descrição'].map(dic_fund)
     
+    investment_fund['Valor'] = pd.to_numeric(
+        investment_fund['Valor']
+        .astype(str)
+        .str.replace('.', '', regex=False)
+        .str.replace(',', '.', regex=False)
+        .str.strip(),
+        errors='coerce'
+        ).fullna(0.0)
+    
     investment_fund = calculate_revenue(investment_fund)
     
     return investment_fund
