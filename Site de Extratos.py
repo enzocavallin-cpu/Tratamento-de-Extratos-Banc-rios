@@ -529,7 +529,7 @@ def ce_if(output_pdf):
     
     dic_fund = {'APLICACAO': 'Aplicação', 'RESGATE': 'Resgate'}
     
-    investment_fund = investment_fund.map(dic_fund)
+    investment_fund['Descrição'] = investment_fund['Descrição'].map(dic_fund)
     
     investment_fund = calculate_revenue(investment_fund)
     
