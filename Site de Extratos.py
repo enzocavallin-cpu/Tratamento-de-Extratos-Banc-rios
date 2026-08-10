@@ -234,7 +234,11 @@ def normalize_if_columns(extract):
     normalization_if_dic = {
         'SALDO ANTERIOR': 'Saldo Anterior',
         'SALDO ATUAL': 'Saldo Final',
-        'Saldo Atual': 'Saldo Final'
+        'Saldo Atual': 'Saldo Final',
+        'RESGATE': 'Resgate',
+        'COBRANÇA DE IR': 'Cobrança de IR',
+        'APLICAÇÃO': 'Aplicação'
+        
         }
     
     extract['Descrição'] = (
@@ -477,15 +481,7 @@ def bb_if(output_pdf):
     investment_fund = pd.DataFrame(data)
     investment_fund['prioridade'] = investment_fund.apply(define_if_priority, axis=1)
     investment_fund = normalize_if_columns(investment_fund)
-    if_dic = {
-        'RESGATE': 'Resgate',
-        'COBRANÇA DE IR': 'Cobrança de IR'
-        }
-    
-    investment_fund['Descrição'] = (
-        investment_fund['Descrição']
-        .str.strip()
-        .str.replace(if_dic))
+       
     investment_fund = investment_fund.sort_values(
         by=['Data', 'prioridade'], 
         ascending=[True, True]
@@ -670,7 +666,7 @@ if st.session_state.step == 2:
                     output_pdf = unite_pdfs(extract_files)
                     account = bb_cc(output_pdf)
                 
-                final_extract(account)
+                account = final_extract(account)
                     
                      
             elif second_choice == 'Banco do Brasil' and third_choice == 'Conta Poupança':
@@ -678,21 +674,21 @@ if st.session_state.step == 2:
                     output_pdf = unite_pdfs(extract_files)
                     account = bb_cp(output_pdf)
                 
-                final_extract(account)
+                account = final_extract(account)
                     
             elif second_choice == 'Banco do Brasil' and third_choice == 'Fundo de Investimento':
                 with st.spinner("Extraindo e normalizando dados do extrato..."):
                     output_pdf = unite_pdfs(extract_files)
                     account = bb_if(output_pdf)
                 
-                final_extract(account)
+                account = final_extract(account)
 
             elif second_choice == 'Caixa Econômica Federal' and third_choice == 'Fundo de Investimento':
                 with st.spinner("Extraindo e normalizando dados do extrato..."):
                     output_pdf = unite_pdfs(extract_files)
                     account = ce_if(output_pdf)
 
-                final_extract(account)
+                account = final_extract(account)
             
             nome_base = st.text_input("Digite o nome para o arquivo final (sem extensão):", value="extrato_bb_cc_tratado")
             
