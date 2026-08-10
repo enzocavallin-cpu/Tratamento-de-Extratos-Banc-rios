@@ -701,9 +701,9 @@ if st.session_state.step == 2:
                 with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
                     account.to_excel(writer, index=False, sheet_name='Extrato_Tratado')
                     
-                output_excel.seek(0)
-                if output_pdf:
-                    output_pdf.seek(0)
+                account.seek(0)
+                if account:
+                    account.seek(0)
             
                 st.download_button(
                     label="📊 Baixar Extrato em Excel (.xlsx)",
