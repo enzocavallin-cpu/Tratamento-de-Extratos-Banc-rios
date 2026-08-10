@@ -700,11 +700,14 @@ if st.session_state.step == 2:
                 
                 with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
                     account.to_excel(writer, index=False, sheet_name='Extrato_Tratado')
-                    
-                account.seek(0)
-                if account:
-                    account.seek(0)
-            
+                
+                output_excel.seek(0)
+                
+                if output_pdf is not None:
+                    output_pdf.seek(0)
+                
+                st.subheader("📥 Opções de Download")
+                
                 st.download_button(
                     label="📊 Baixar Extrato em Excel (.xlsx)",
                     data=output_excel,
@@ -712,18 +715,16 @@ if st.session_state.step == 2:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 
-                st.download_button(
-                    label="📄 Baixar Cópia do PDF Unificado (.pdf)",
-                    data=output_pdf,
-                    file_name=f"{nome_base}_unificado.pdf",
-                    mime="application/pdf"
-                )
-            
+                if output_pdf is not None:
+                    st.download_button(
+                        label="📄 Baixar Cópia do PDF Unificado (.pdf)",
+                        data=output_pdf,
+                        file_name=f"{nome_base}_unificado.pdf",
+                        mime="application/pdf"
+                    )
             
             else:
                 st.warning("⚠️ Não foi possível ler ou estruturar os dados do arquivo.")
-        else:
-            st.info(f"A lógica para {second_choice} - {third_choice} está aguardando suas funções de processamento.")
 
 
 
