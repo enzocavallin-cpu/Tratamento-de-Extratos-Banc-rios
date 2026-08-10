@@ -661,6 +661,9 @@ if st.session_state.step == 2:
         if extract_files:
             st.success("Arquivo recebido! Pronto para processar.")
             
+            account = None
+            output_pdf = None
+            
             if second_choice == 'Banco do Brasil' and third_choice == 'Conta Corrente':
                 with st.spinner("Extraindo e normalizando dados do extrato..."):
                     output_pdf = unite_pdfs(extract_files)
@@ -690,30 +693,32 @@ if st.session_state.step == 2:
 
                 account = final_extract(account)
             
-            nome_base = st.text_input("Digite o nome para o arquivo final (sem extensão):", value="extrato_bb_cc_tratado")
+            if account is not None and not account.empty:
+                nome_base = st.text_input("Digite o nome para o arquivo final (sem extensão):", value="extrato_bb_cc_tratado")
             
-            output_excel = BytesIO()
+                output_excel = BytesIO()
+                
+                with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
+                    account.to_excel(writer, index=False, sheet_name='Extrato_Tratado')
+                    
+                output_excel.seek(0)
+                if output_pdf:
+                    output_pdf.seek(0)
             
-            st.download_button(
-                label="📊 Baixar Extrato em Excel (.xlsx)",
-                data=output_excel,
-                file_name=f"{nome_base}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+                st.download_button(
+                    label="📊 Baixar Extrato em Excel (.xlsx)",
+                    data=output_excel,
+                    file_name=f"{nome_base}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+                
+                st.download_button(
+                    label="📄 Baixar Cópia do PDF Unificado (.pdf)",
+                    data=output_pdf,
+                    file_name=f"{nome_base}_unificado.pdf",
+                    mime="application/pdf"
+                )
             
-            st.download_button(
-                label="📄 Baixar Cópia do PDF Unificado (.pdf)",
-                data=output_pdf,
-                file_name=f"{nome_base}_unificado.pdf",
-                mime="application/pdf"
-            )
-            
-            with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
-                account.to_excel(writer, index=False, sheet_name='Extrato_Tratado')
-            output_excel.seek(0)
-            
-            if output_pdf:
-                output_pdf.seek(0)
             
             else:
                 st.warning("⚠️ Não foi possível ler ou estruturar os dados do arquivo.")
