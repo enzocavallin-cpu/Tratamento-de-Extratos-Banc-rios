@@ -637,94 +637,165 @@ if st.session_state.step == 2:
         st.header("📄 Unificador de Arquivos PDF")
         interface_unite_pdfs()
 
-    elif st.session_state.main_choice == 'Planilhar Extratos Bancários':
+    elif st.session_state.main_choice == "Planilhar Extratos Bancários":
+
         st.header("📊 Planilhador de Extratos")
-        
+
         second_choice = st.selectbox(
             "Selecione o Banco:",
-            ["Banco do Brasil", "Caixa Econômica Federal"]
+            [
+                "Banco do Brasil",
+                "Caixa Econômica Federal"
+            ]
         )
-        
+
         third_choice = st.selectbox(
-            'Selecione o tipo de extrato:',
-            ['Conta Corrente', 'Conta Poupança', 'Fundo de Investimento']
+            "Selecione o tipo de extrato:",
+            [
+                "Conta Corrente",
+                "Conta Poupança",
+                "Fundo de Investimento"
+            ]
         )
-        
-        st.info(f"Configuração selecionada: {second_choice} ({third_choice})")
-        
+
+        st.info(
+            f"Configuração selecionada: "
+            f"{second_choice} ({third_choice})"
+        )
+
         extract_files = st.file_uploader(
-            f"Arraste os PDFs dos extratos de {third_choice} aqui", 
+            f"Arraste os PDFs dos extratos de {third_choice} aqui",
             type="pdf",
             accept_multiple_files=True
         )
-        
+
         if extract_files:
-            st.success("Arquivo recebido! Pronto para processar.")
-            
-            account = None
+
+            st.success(
+                f"{len(extract_files)} arquivo(s) recebido(s)! "
+                "Pronto para processar."
+            )
+
             output_pdf = None
-            
-            if second_choice == 'Banco do Brasil' and third_choice == 'Conta Corrente':
-                with st.spinner("Extraindo e normalizando dados do extrato..."):
+            account = None
+
+            if (
+                second_choice == "Banco do Brasil"
+                and third_choice == "Conta Corrente"
+            ):
+
+                with st.spinner(
+                    "Extraindo e normalizando dados do extrato..."
+                ):
                     output_pdf = unite_pdfs(extract_files)
                     account = bb_cc(output_pdf)
-                
-                account = final_extract(account)
-                    
-                     
-            elif second_choice == 'Banco do Brasil' and third_choice == 'Conta Poupança':
-                with st.spinner("Extraindo e normalizando dados do extrato..."):
+
+
+            elif (
+                second_choice == "Banco do Brasil"
+                and third_choice == "Conta Poupança"
+            ):
+
+                with st.spinner(
+                    "Extraindo e normalizando dados do extrato..."
+                ):
                     output_pdf = unite_pdfs(extract_files)
                     account = bb_cp(output_pdf)
-                
-                account = final_extract(account)
-                    
-            elif second_choice == 'Banco do Brasil' and third_choice == 'Fundo de Investimento':
-                with st.spinner("Extraindo e normalizando dados do extrato..."):
+
+
+            elif (
+                second_choice == "Banco do Brasil"
+                and third_choice == "Fundo de Investimento"
+            ):
+
+                with st.spinner(
+                    "Extraindo e normalizando dados do extrato..."
+                ):
                     output_pdf = unite_pdfs(extract_files)
                     account = bb_if(output_pdf)
-                
-                account = final_extract(account)
 
-            elif second_choice == 'Caixa Econômica Federal' and third_choice == 'Fundo de Investimento':
-                with st.spinner("Extraindo e normalizando dados do extrato..."):
+
+            elif (
+                second_choice == "Caixa Econômica Federal"
+                and third_choice == "Fundo de Investimento"
+            ):
+
+                with st.spinner(
+                    "Extraindo e normalizando dados do extrato..."
+                ):
                     output_pdf = unite_pdfs(extract_files)
                     account = ce_if(output_pdf)
 
-                account = final_extract(account)
-            
+
+            else:
+
+                st.warning(
+                    f"Ainda não existe uma função de processamento "
+                    f"para {second_choice} + {third_choice}."
+                )
+
+
             if isinstance(account, pd.DataFrame) and not account.empty:
-                nome_base = st.text_input("Digite o nome para o arquivo final (sem extensão):", value="extrato_bb_cc_tratado")
-            
+
+                account = final_extract(account)
+
+                nome_padrao = (
+                    f"extrato_"
+                    f"{second_choice.lower().replace(' ', '_')}_"
+                    f"{third_choice.lower().replace(' ', '_')}_tratado"
+                )
+
+                nome_base = st.text_input(
+                    "Digite o nome para o arquivo final "
+                    "(sem extensão):",
+                    value=nome_padrao
+                )
+
                 output_excel = BytesIO()
-                
-                with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
-                    account.to_excel(writer, index=False, sheet_name='Extrato_Tratado')
-                
+
+                with pd.ExcelWriter(
+                    output_excel,
+                    engine="openpyxl"
+                ) as writer:
+
+                    account.to_excel(
+                        writer,
+                        index=False,
+                        sheet_name="Extrato_Tratado"
+                    )
+
                 output_excel.seek(0)
-                
+
                 if output_pdf is not None:
                     output_pdf.seek(0)
-                
+
                 st.subheader("📥 Opções de Download")
-                
+
                 st.download_button(
                     label="📊 Baixar Extrato em Excel (.xlsx)",
                     data=output_excel,
                     file_name=f"{nome_base}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    mime=(
+                        "application/vnd.openxmlformats-officedocument."
+                        "spreadsheetml.sheet"
+                    )
                 )
-                
+
                 if output_pdf is not None:
+
                     st.download_button(
                         label="📄 Baixar Cópia do PDF Unificado (.pdf)",
                         data=output_pdf,
                         file_name=f"{nome_base}_unificado.pdf",
                         mime="application/pdf"
                     )
-            
-            else:
-                st.warning("⚠️ Não foi possível ler ou estruturar os dados do arquivo.")
+
+            elif account is not None:
+
+                st.warning(
+                    "⚠️ O processamento foi executado, "
+                    "mas não foram encontrados dados válidos."
+                )
 
 
 
