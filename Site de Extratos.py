@@ -10,6 +10,8 @@ import pandas as pd
 import numpy as np
 import hashlib
 
+st.set_page_config(page_title="Gerenciador de Extratos Bancários e Unificador de PDFs", page_icon="📄")
+
 #-----------------------------------------------------------------------------
 # Function to Unite PDFs:
 #-----------------------------------------------------------------------------
@@ -572,17 +574,26 @@ def final_extract(df_dados: pd.DataFrame, titulo: str = "📋 Extrato Processado
         df_exibicao = df_dados.copy()
         
         if 'Data' in df_exibicao.columns:
-            df_exibicao['Data'] = pd.to_datetime(df_exibicao['Data']).dt.strftime('%d/%m/%Y')
+            df_exibicao['Data'] = pd.to_datetime(
+                df_exibicao['Data']
+            ).dt.strftime('%d/%m/%Y')
         
-        st.dataframe(df_exibicao, use_container_width=True)
-        st.metric(label="Total de Lançamentos Encontrados", value=len(df_dados))
+        st.dataframe(
+            df_exibicao,
+            use_container_width=True
+        )
+        
+        st.metric(
+            label="Total de Lançamentos Encontrados",
+            value=len(df_dados)
+        )
         
         st.divider()
         st.subheader("📥 Opções de Download")
         
-        return True
+        return df_dados
         
-    return False
+    return None
 
 
 #-----------------------------------------------------------------------------
@@ -605,8 +616,6 @@ def return_start():
 #-----------------------------------------------------------------------------
 # Main Interface:
 #-----------------------------------------------------------------------------
-    
-st.set_page_config(page_title="Gerenciador de Extratos Bancários e Unificador de PDFs", page_icon="📄")
 st.title("📄 Gerenciador de Extratos Bancários e Unificador de PDFs")
 
 if st.session_state.step == 1:
