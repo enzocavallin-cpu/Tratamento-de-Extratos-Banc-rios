@@ -477,6 +477,15 @@ def bb_if(output_pdf):
     investment_fund = pd.DataFrame(data)
     investment_fund['prioridade'] = investment_fund.apply(define_if_priority, axis=1)
     investment_fund = normalize_if_columns(investment_fund)
+    if_dic = {
+        'RESGATE': 'Resgate',
+        'COBRANÇA DE IR': 'Cobrança de IR'
+        }
+    
+    investment_fund['Descrição'] = (
+        investment_fund['Descrição']
+        .str.strip()
+        .str.replace(if_dic))
     investment_fund = investment_fund.sort_values(
         by=['Data', 'prioridade'], 
         ascending=[True, True]
