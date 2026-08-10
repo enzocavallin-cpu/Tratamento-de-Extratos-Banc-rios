@@ -753,18 +753,30 @@ if st.session_state.step == 2:
 
                 output_excel = BytesIO()
 
-                with pd.ExcelWriter(
-                    output_excel,
-                    engine="openpyxl"
-                ) as writer:
-
-                    account.to_excel(
-                        writer,
-                        index=False,
-                        sheet_name="Extrato_Tratado"
+                if account is not None and not account.empty and len(account.columns) > 0:
+                
+                    with pd.ExcelWriter(
+                        output_excel,
+                        engine="openpyxl"
+                    ) as writer:
+                
+                        account.to_excel(
+                            writer,
+                            index=False,
+                            sheet_name="Extrato_Tratado"
+                        )
+                
+                        worksheet = writer.book["Extrato_Tratado"]
+                        worksheet.sheet_state = "visible"
+                
+                    output_excel.seek(0)
+                
+                else:
+                    st.error(
+                        "Não foi possível gerar o Excel porque o DataFrame "
+                        "não possui dados ou colunas."
                     )
-
-                output_excel.seek(0)
+                    st.stop()
 
                 if output_pdf is not None:
                     output_pdf.seek(0)
