@@ -693,7 +693,7 @@ if st.session_state.step == 2:
 
                 account = final_extract(account)
             
-            if account is not None and not account.empty:
+            if isinstance(account, pd.DataFrame) and not account.empty:
                 nome_base = st.text_input("Digite o nome para o arquivo final (sem extensão):", value="extrato_bb_cc_tratado")
             
                 output_excel = BytesIO()
