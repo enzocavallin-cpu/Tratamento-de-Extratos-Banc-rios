@@ -663,7 +663,7 @@ def ce_if(output_pdf):
     
     
     
-    investment_fund["Val_Aplicacao"] = np.where(
+    """investment_fund["Val_Aplicacao"] = np.where(
         investment_fund["Descrição"].str.contains("Aplicação", na=False), investment_fund["Valor"], 0
     )
     investment_fund["Val_Aplicacao"] = (
@@ -696,7 +696,7 @@ def ce_if(output_pdf):
     
     investment_fund['Valor'] = investment_fund['Valor'].mask(
         investment_fund['Descrição'] == 'Saldo Final', condicao
-        )
+        )"""
     
     investment_fund['Valor'] = pd.to_numeric(
         investment_fund['Valor']
