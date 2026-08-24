@@ -520,6 +520,12 @@ def ce_cc(output_pdf):
             if not text:
                 continue
             
+            if 'Lançamentos do Dia' in text:
+                text = text.split('Lançamentos do Dia')[0]
+            
+            lines = text.split('\n')
+            clean_text = ' '.join(lines)
+            
             lines = text.split('\n')
             
             clean_text = ' '.join(lines)
@@ -539,6 +545,15 @@ def ce_cc(output_pdf):
                     })
                         
     checking_account = pd.DataFrame(data)
+    
+    checking_account['Saldo'] = checking_account['Saldo'].str.replace('.', '').str.replace(',', '.')
+    checking_account['Saldo'] = pd.to_numeric(checking_account['Saldo'])
+    
+    checking_account['Saldo'] = np.where(
+    checking_account['Natureza_Saldo'] == 'D',
+    -checking_account['Saldo'],
+    checking_account['Saldo']
+    )
     
     checking_account = checking_account.drop(columns='natureza_saldo')
    
