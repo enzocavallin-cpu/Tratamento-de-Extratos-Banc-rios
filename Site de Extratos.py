@@ -209,7 +209,7 @@ def normalize_columns(extract):
         "CRPCV POUP": "Crédito de Pagamento de Convênio via Poupança",
         "DBPCV POUP": "Débito de Pagamento de Convênio via Poupança",
         "DBPCV TED": "Débito de Pagamento de Convênio via Transferência Eletrônica Disponível",
-        "DBPCV TV": "Débito de Pagamento de Convênio / Título via Terminal Virtual",
+        "DBPCV TV": "Débito de Pagamento de Convênio via Terminal Virtual",
         "DEVOL TED": "Devolução de Transferência Eletrônica Disponível",
         "EDPCV TV": "Estorno de Débito de Pagamento de Convênio via Terminal Virtual",
         "RESG AUTOM": "Resgate Automático"
@@ -609,7 +609,7 @@ def ce_if(output_pdf):
 
     data = []
 
-    with pdfplumber.open('C:/Users/enzo.barboza/Downloads/in/EXTRATO APLICAÇÃO 07 2023 2562.pdf') as pdf:
+    with pdfplumber.open(output_pdf) as pdf:
         for page in pdf.pages:
             page_text = page.extract_text()
             if not page_text:
