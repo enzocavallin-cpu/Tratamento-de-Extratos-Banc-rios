@@ -309,7 +309,7 @@ def bb_cc(output_pdf):
                 for match in matches_one:
                     data.append({
                         "Data": match.group(1),
-                        "Codigo": match.group(2) if match.group(2) else "",
+                        "Lote": match.group(2) if match.group(2) else "",
                         "Descrição": match.group(3).strip(),
                         "Documento": match.group(4) if match.group(4) else "",
                         "Valor": match.group(5),
@@ -319,7 +319,7 @@ def bb_cc(output_pdf):
                 for match in matches_two:
                     data.append({
                         'Data': match.group(1),
-                        'Codigo': match.group(3) if match.group(3) else "",
+                        'Lote': match.group(3) if match.group(3) else "",
                         'Descrição': match.group(2).strip(),
                         'Documento': match.group(4) if match.group(4) else "",
                         'Valor': match.group(5),
@@ -329,7 +329,7 @@ def bb_cc(output_pdf):
                 for match in matches_three:
                     data.append({
                                     'Data': match.group(1),
-                                    'Codigo': match.group(3) if match.group(3) else "",
+                                    'lote': match.group(3) if match.group(3) else "",
                                     'Descrição': match.group(2).strip(),
                                     'Documento': match.group(4) if match.group(4) else "",
                                     'Valor': match.group(5),
@@ -342,12 +342,12 @@ def bb_cc(output_pdf):
     checking_account['Descrição'] = (
     checking_account['Descrição']
     .replace('', pd.NA)
-    .groupby([checking_account['Data'], checking_account['Codigo']])
+    .groupby([checking_account['Data'], checking_account['Lote']])
     .transform(lambda s: s.ffill().bfill())
     .fillna('')
     )
     
-    checking_account = checking_account.drop(columns=['Codigo'])
+    checking_account = checking_account.drop(columns=['Lote'])
     
     checking_account = normalize_columns(checking_account)
     checking_account['prioridade'] = checking_account.apply(define_priority, axis=1)
@@ -359,7 +359,6 @@ def bb_cc(output_pdf):
     
     checking_account = checking_account.drop(columns=['prioridade'])
     checking_account = checking_account.drop_duplicates()
-    checking_account = checking_account.drop(columns=['Documento'])
     
     return checking_account
 
