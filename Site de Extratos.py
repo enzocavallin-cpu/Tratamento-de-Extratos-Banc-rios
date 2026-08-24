@@ -339,16 +339,13 @@ def bb_cc(output_pdf):
     checking_account = pd.DataFrame(data)
     checking_account = checking_account.apply(adjust_description, axis=1)
     
-    mask_code = checking_account['Codigo'] != ''
-    
-    if mask_code.any():
-        checking_account.loc[mask_code, 'Descrição'] = (
-            checking_account.loc[mask_code, 'Descrição']
-            .replace('', pd.NA)
-            .groupby([checking_account.loc[mask_code, 'Data'], checking_account.loc[mask_code, 'Codigo']])
-            .transform(lambda s: s.ffill().bfill())
-            .fillna('')
-        )
+    checking_account['Descrição'] = (
+    checking_account['Descrição']
+    .replace('', pd.NA)
+    .groupby([checking_account['Data'], checking_account['Codigo']])
+    .transform(lambda s: s.ffill().bfill())
+    .fillna('')
+    )
     
     checking_account = checking_account.drop(columns=['Codigo'])
     
