@@ -507,15 +507,19 @@ def ce_if(output_pdf):
     )
     pattern_year = r'\s\d{2}(\/\d{4})\s'
 
+    pattern_revenue = (
+        r'\sRendimento Bruto no Mês\s([\d\.]+[\,\.]\d{2})+'
+        r'([D|C])'
+                       )
+
     data = []
 
-    with pdfplumber.open(output_pdf) as pdf:
+    with pdfplumber.open('C:/Users/enzo.barboza/Downloads/in/EXTRATO APLICAÇÃO 07 2023 2562.pdf') as pdf:
         for page in pdf.pages:
             page_text = page.extract_text()
             if not page_text:
                 continue
-                
-            # Busca apenas no texto extraído DA PÁGINA ATUAL
+        
             matches_one = list(re.finditer(pattern, page_text))
             if matches_one:
                 for match in matches_one:
@@ -533,16 +537,27 @@ def ce_if(output_pdf):
                     data.append({
                         "Ano": match.group(1)
                     })
+                    
+            matches_three = list(re.finditer(pattern_revenue, page_text))
+            if matches_three:
+                for match in matches_three:
+                    data.append({
+                        "Rendimento Mensal": match.group(1),
+                        "Natureza": match.group(2)
+                    })
 
     investment_fund = pd.DataFrame(data)
-    
+
     investment_fund['Ano'] = investment_fund['Ano'].bfill()
+    investment_fund['Ano'] = investment_fund['Ano'].ffill(limit=1)
+    investment_fund['Descrição'] = investment_fund['Descrição'].mask(
+        investment_fund['Rendimento Mensal'].notna(), 'Saldo Final'
+    )
     investment_fund = investment_fund.dropna(subset=['Descrição'])
     investment_fund['Data'] = (
         investment_fund['Data'].astype(str).str.replace(' ', '') + 
         investment_fund['Ano'].astype(str).str.strip()
     )
-    
     investment_fund = investment_fund.drop(columns=['Ano'])
 
     investment_fund['Data'] = pd.to_datetime(investment_fund['Data'].str.replace(' ', ''), format='%d/%m/%Y', errors='coerce')
@@ -550,6 +565,43 @@ def ce_if(output_pdf):
     dic_fund = {'APLICACAO': 'Aplicação', 'RESGATE': 'Resgate'}
     
     investment_fund['Descrição'] = investment_fund['Descrição'].replace(dic_fund)
+    
+    
+    
+    investment_fund["Val_Aplicacao"] = np.where(
+        investment_fund["Descrição"].str.contains("Aplicação", na=False), investment_fund["Valor"], 0
+    )
+    investment_fund["Val_Aplicacao"] = (
+        investment_fund["Val_Aplicacao"]
+        .str.replace('.', '')
+        .str.replace(',', '.'))
+    investment_fund["Val_Aplicacao"] = pd.to_numeric(investment_fund["Val_Aplicacao"])
+    
+    
+    investment_fund["Val_Resgate"] = np.where(
+        investment_fund["Descrição"].str.contains("Resgate", na=False), investment_fund["Valor"], 0
+    )
+    investment_fund["Val_Resgate"] = (
+        investment_fund["Val_Resgate"]
+        .str.replace('.', '')
+        .str.replace(',', '.'))
+    
+    investment_fund["Val_Resgate"] = pd.to_numeric(investment_fund["Val_Resgate"])
+
+
+    investment_fund["Ano_Mes"] = investment_fund["Data"].dt.to_period("M")
+
+    totais_mes = investment_fund.groupby("Ano_Mes")[
+        ["Val_Aplicacao", "Val_Resgate"]
+    ].transform("sum")
+    investment_fund["Val_Aplicacao_Mes"] = totais_mes["Val_Aplicacao"]
+    investment_fund["Val_Resgate_Mes"] = totais_mes["Val_Resgate"]
+    
+    condicao = investment_fund["Val_Aplicacao_Mes"] - investment_fund["Val_Resgate_Mes"]
+    
+    investment_fund['Valor'] = investment_fund['Valor'].mask(
+        investment_fund['Descrição'] == 'Saldo Final', condicao
+        )
     
     investment_fund['Valor'] = pd.to_numeric(
         investment_fund['Valor']
@@ -560,7 +612,11 @@ def ce_if(output_pdf):
         errors='coerce'
         ).fillna(0.0)
     
-    investment_fund = calculate_revenue(investment_fund)
+    data_base = investment_fund['Data'].dropna().iloc[0]
+
+    ultimo_dia = data_base + pd.offsets.MonthEnd(0)
+    
+    investment_fund['Data'] = investment_fund['Data'].fillna(ultimo_dia)
     
     return investment_fund
     
