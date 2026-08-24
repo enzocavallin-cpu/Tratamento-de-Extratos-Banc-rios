@@ -542,14 +542,6 @@ def ce_cc(output_pdf):
    
     checking_account = checking_account.apply(adjust_description, axis=1)
     
-    checking_account['Descrição'] = (
-    checking_account['Descrição']
-    .replace('', pd.NA)
-    .groupby([checking_account['Data'], checking_account['Lote']])
-    .transform(lambda s: s.ffill().bfill())
-    .fillna('')
-    )
-    
     checking_account = normalize_columns(checking_account)
     checking_account['prioridade'] = checking_account.apply(define_priority, axis=1)
     
