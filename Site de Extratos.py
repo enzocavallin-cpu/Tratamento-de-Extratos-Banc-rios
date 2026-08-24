@@ -347,8 +347,6 @@ def bb_cc(output_pdf):
     .fillna('')
     )
     
-    checking_account = checking_account.drop(columns=['Lote'])
-    
     checking_account = normalize_columns(checking_account)
     checking_account['prioridade'] = checking_account.apply(define_priority, axis=1)
     
@@ -359,6 +357,9 @@ def bb_cc(output_pdf):
     
     checking_account = checking_account.drop(columns=['prioridade'])
     checking_account = checking_account.drop_duplicates()
+    
+    valores_sinalizados = np.where(checking_account['Natureza'] == 'C', checking_account['Valor'], - checking_account['Valor'])
+    checking_account['Saldo'] = valores_sinalizados.cumsum()
     
     return checking_account
 
