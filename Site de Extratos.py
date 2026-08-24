@@ -597,7 +597,7 @@ def ce_if(output_pdf):
     pattern = (
     r'(\d{2}\s*\/\s*\d{2})\s+'
     r'([A-Za-zÀ-ÿ0-9\s\-\.\/\?]+?)\s+'
-    r'([\d\.]+[\,\.]\d{2})\s*+' 
+    r'([\d\.]+[\,\.]\d{2})\s*' 
     r'(D|C)'
     )
     pattern_year = r'\s\d{2}(\/\d{4})\s'
@@ -644,7 +644,11 @@ def ce_if(output_pdf):
     dic_fund = {'APLICACAO': 'Aplicação', 'RESGATE': 'Resgate'}
     
     investment_fund['Descrição'] = investment_fund['Descrição'].replace(dic_fund)
-
+    
+    investment_fund['Valor'] = investment_fund['Valor'].str.replace('.', '').str.replace(',', '.')
+    investment_fund['Valor'] = pd.to_numeric(investment_fund['Valor'], errors='coerce')
+    
+    investment_fund = investment_fund.sort_values(by='Data', ascending=True)   
     
     return investment_fund
     
