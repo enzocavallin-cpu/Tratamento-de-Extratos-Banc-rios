@@ -200,7 +200,11 @@ def normalize_columns(extract):
         "SALDO ANTERIOR": "Saldo Anterior",
         "Reajuste Monetrio BACEN": "Reajuste Monetário",
         "APLICACAO": "Aplicação",
-        "RESGATE": "Resgate"
+        "RESGATE": "Resgate",
+        "SALDO ANTERIOR": "Saldo Anterior",
+        "DBPCV TV": "Débito de Pagamento de Convênio / Título via Terminal Virtual",
+        "CRED TED": "Crédito por Transferência Eletrônica Disponível",
+        "APL AUTOM": "Aplicação Automática"
     }
     
     extract['Descrição'] = (
@@ -361,6 +365,8 @@ def bb_cc(output_pdf):
     valores_sinalizados = np.where(checking_account['Natureza'] == 'C', checking_account['Valor'], - checking_account['Valor'])
     checking_account['Saldo'] = valores_sinalizados.cumsum()
     
+    checking_account = checking_account[['Data', 'Documento', 'Lote', 'Descrição', 'Natureza', 'Valor', 'Saldo']]
+    
     return checking_account
 
 #-----------------------------------------------------------------------------
@@ -490,6 +496,77 @@ def bb_if(output_pdf):
     investment_fund = calculate_revenue(investment_fund)
     
     return investment_fund
+
+#-----------------------------------------------------------------------------
+# Function to Create CE_CC from united pdf:
+#-----------------------------------------------------------------------------
+
+def ce_cc(output_pdf):
+    pattern_one = (
+        r'(\d{2}\/\d{2}\/\d{4})\s+'
+        r'(?:\d{1,20}\s+)?'
+        r'([A-Za-zÀ-ÿ0-9\s\-\.\/\?]+?)\s+'
+        r'([\d\.]+[\,\.]\d{2})\s+'
+        r'(D|C)\s+'
+        r'([\d\.]+[\,\.]\d{2})\s+'
+        r'(D|C)'
+    )
+    
+    data = []
+    
+    with pdfplumber.open(output_pdf) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if not text:
+                continue
+            
+            lines = text.split('\n')
+            
+            clean_text = ' '.join(lines)
+            
+            matches_one = list(re.finditer(pattern_one, clean_text))
+            
+            if len(matches_one) > 0:
+                for match in matches_one:
+                    data.append({
+                        "Data": match.group(1),
+                        "Documento": match.group(2),
+                        "Descrição": match.group(3).strip(),
+                        "Valor": match.group(4),
+                        "Natureza": match.group(5)
+                    })
+                        
+    checking_account = pd.DataFrame(data)
+    
+    
+   
+    checking_account = checking_account.apply(adjust_description, axis=1)
+    
+    checking_account['Descrição'] = (
+    checking_account['Descrição']
+    .replace('', pd.NA)
+    .groupby([checking_account['Data'], checking_account['Lote']])
+    .transform(lambda s: s.ffill().bfill())
+    .fillna('')
+    )
+    
+    checking_account = normalize_columns(checking_account)
+    checking_account['prioridade'] = checking_account.apply(define_priority, axis=1)
+    
+    checking_account = checking_account.sort_values(
+        by=['Data', 'prioridade', 'Documento'], 
+        ascending=[True, True, True]
+    )
+    
+    checking_account = checking_account.drop(columns=['prioridade'])
+    checking_account = checking_account.drop_duplicates()
+    
+    valores_sinalizados = np.where(checking_account['Natureza'] == 'C', checking_account['Valor'], - checking_account['Valor'])
+    checking_account['Saldo'] = valores_sinalizados.cumsum()
+    
+    checking_account = checking_account[['Data', 'Documento', 'Descrição', 'Natureza', 'Valor', 'Saldo']]
+   
+    return checking_account
 
 #-----------------------------------------------------------------------------
 # Function to Create CE_IF from united pdf:
@@ -775,6 +852,13 @@ if st.session_state.step == 2:
                 ):
                     output_pdf = unite_pdfs(extract_files)
                     account = bb_if(output_pdf)
+            
+            elif (
+                    second_choice == "Caixa Econômica Federal"
+                    and third_choice == "Conta Corrente"
+                ):
+                output_pdf = unite_pdfs(extract_files)
+                account = ce_cc(output_pdf)
 
 
             elif (
