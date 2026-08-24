@@ -504,7 +504,7 @@ def bb_if(output_pdf):
 def ce_cc(output_pdf):
     pattern_one = (
         r'(\d{2}\/\d{2}\/\d{4})\s+'
-        r'(\d{1,20}\s+)'
+        r'(\d{1,20})\s+'                  # Removido \s+ interno para limpar o documento
         r'([A-Za-zÀ-ÿ0-9\s\-\.\/\?]+?)\s+'
         r'([\d\.]+[\,\.]\d{2})\s+'
         r'(D|C)\s+'
@@ -526,39 +526,46 @@ def ce_cc(output_pdf):
             lines = text.split('\n')
             clean_text = ' '.join(lines)
             
-            lines = text.split('\n')
-            
-            clean_text = ' '.join(lines)
-            
             matches_one = list(re.finditer(pattern_one, clean_text))
             
-            if len(matches_one) > 0:
-                for match in matches_one:
-                    data.append({
-                        "Data": match.group(1),
-                        "Documento": match.group(2),
-                        "Descrição": match.group(3).strip(),
-                        "Natureza": match.group(5),
-                        "Valor": match.group(4),
-                        "Saldo": match.group(6),
-                        "natureza_saldo": match.group(7)
-                    })
-                        
+            for match in matches_one:
+                data.append({
+                    "Data": match.group(1),
+                    "Documento": match.group(2).strip(),
+                    "Descrição": match.group(3).strip(),
+                    "Valor": match.group(4),
+                    "Natureza": match.group(5),
+                    "Saldo": match.group(6),
+                    "Natureza_Saldo": match.group(7) # 1. Nome unificado (com N e S maiúsculos)
+                })
+    
+    # Tratamento para PDF sem correspondências
+    if not data:
+        return pd.DataFrame(columns=['Data', 'Documento', 'Descrição', 'Natureza', 'Valor', 'Saldo'])
+
     checking_account = pd.DataFrame(data)
     
-    checking_account['Saldo'] = checking_account['Saldo'].str.replace('.', '').str.replace(',', '.')
-    checking_account['Saldo'] = pd.to_numeric(checking_account['Saldo'])
-    
-    checking_account['Saldo'] = np.where(
-    checking_account['Natureza_Saldo'] == 'D',
-    -checking_account['Saldo'],
-    checking_account['Saldo']
+    # 2. Converte o Saldo textual para numérico (float)
+    checking_account['Saldo'] = (
+        checking_account['Saldo']
+        .astype(str)
+        .str.replace('.', '', regex=False)
+        .str.replace(',', '.', regex=False)
+        .astype(float)
     )
     
-    checking_account = checking_account.drop(columns='natureza_saldo')
-   
-    checking_account = checking_account.apply(adjust_description, axis=1)
+    # 3. Aplica o sinal negativo no Saldo usando o nome correto da coluna
+    checking_account['Saldo'] = np.where(
+        checking_account['Natureza_Saldo'] == 'D',
+        -checking_account['Saldo'],
+        checking_account['Saldo']
+    )
     
+    # 4. Remove a coluna auxiliar do saldo
+    checking_account = checking_account.drop(columns=['Natureza_Saldo'])
+   
+    # Funções customizadas
+    checking_account = checking_account.apply(adjust_description, axis=1)
     checking_account = normalize_columns(checking_account)
     checking_account['prioridade'] = checking_account.apply(define_priority, axis=1)
     
@@ -567,12 +574,9 @@ def ce_cc(output_pdf):
         ascending=[True, True, True]
     )
     
-    checking_account = checking_account.drop(columns=['prioridade'])
-    checking_account = checking_account.drop_duplicates()
+    checking_account = checking_account.drop(columns=['prioridade']).drop_duplicates()
     
-    valores_sinalizados = np.where(checking_account['Natureza'] == 'C', checking_account['Valor'], - checking_account['Valor'])
-    checking_account['Saldo'] = valores_sinalizados.cumsum()
-    
+    # Reorganiza e escolhe as colunas finais
     checking_account = checking_account[['Data', 'Documento', 'Descrição', 'Natureza', 'Valor', 'Saldo']]
    
     return checking_account
