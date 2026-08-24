@@ -202,9 +202,17 @@ def normalize_columns(extract):
         "APLICACAO": "Aplicação",
         "RESGATE": "Resgate",
         "SALDO ANTERIOR": "Saldo Anterior",
-        "DBPCV TV": "Débito de Pagamento de Convênio / Título via Terminal Virtual",
+        "APL AUTOM": "Aplicação Automática",
+        "CRED TEV": "Crédito por Transferência Eletrônica de Valores",
+        "CREDAUTOR": "Crédito Autorizado",
         "CRED TED": "Crédito por Transferência Eletrônica Disponível",
-        "APL AUTOM": "Aplicação Automática"
+        "CRPCV POUP": "Crédito de Pagamento de Convênio via Poupança",
+        "DBPCV POUP": "Débito de Pagamento de Convênio via Poupança",
+        "DBPCV TED": "Débito de Pagamento de Convênio via Transferência Eletrônica Disponível",
+        "DBPCV TV": "Débito de Pagamento de Convênio / Título via Terminal Virtual",
+        "DEVOL TED": "Devolução de Transferência Eletrônica Disponível",
+        "EDPCV TV": "Estorno de Débito de Pagamento de Convênio via Terminal Virtual",
+        "RESG AUTOM": "Resgate Automático"
     }
     
     extract['Descrição'] = (
