@@ -696,7 +696,7 @@ def ce_if(output_pdf):
     
     investment_fund['Valor'] = investment_fund['Valor'].mask(
         investment_fund['Descrição'] == 'Saldo Final', condicao
-        )"""
+        )
     
     investment_fund['Valor'] = pd.to_numeric(
         investment_fund['Valor']
@@ -711,7 +711,7 @@ def ce_if(output_pdf):
 
     ultimo_dia = data_base + pd.offsets.MonthEnd(0)
     
-    investment_fund['Data'] = investment_fund['Data'].fillna(ultimo_dia)
+    investment_fund['Data'] = investment_fund['Data'].fillna(ultimo_dia)"""
     
     return investment_fund
     
