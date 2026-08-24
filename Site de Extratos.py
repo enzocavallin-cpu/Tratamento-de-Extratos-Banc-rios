@@ -710,7 +710,7 @@ def final_extract(df_dados: pd.DataFrame, titulo: str = "📋 Extrato Processado
         
         st.dataframe(
             df_exibicao,
-            use_container_width=True
+            width='stretch'
         )
         
         st.metric(
