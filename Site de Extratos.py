@@ -504,7 +504,7 @@ def bb_if(output_pdf):
 def ce_cc(output_pdf):
     pattern_one = (
         r'(\d{2}\/\d{2}\/\d{4})\s+'
-        r'(?:\d{1,20}\s+)?'
+        r'(\d{1,20}\s+)'
         r'([A-Za-zÀ-ÿ0-9\s\-\.\/\?]+?)\s+'
         r'([\d\.]+[\,\.]\d{2})\s+'
         r'(D|C)\s+'
@@ -532,13 +532,15 @@ def ce_cc(output_pdf):
                         "Data": match.group(1),
                         "Documento": match.group(2),
                         "Descrição": match.group(3).strip(),
+                        "Natureza": match.group(5),
                         "Valor": match.group(4),
-                        "Natureza": match.group(5)
+                        "Saldo": match.group(6),
+                        "natureza_saldo": match.group(7)
                     })
                         
     checking_account = pd.DataFrame(data)
     
-    
+    checking_account = checking_account.drop(columns='natureza_saldo')
    
     checking_account = checking_account.apply(adjust_description, axis=1)
     
