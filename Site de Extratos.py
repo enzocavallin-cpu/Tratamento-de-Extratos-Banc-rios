@@ -43,40 +43,62 @@ def interface_unite_pdfs():
     if uploaded_files:
         st.success(f"{len(uploaded_files)} arquivos carregados com sucesso!")
         
-        # Mapeia o nome do arquivo para o objeto de arquivo correspondente
-        files_dict = {file.name: file for file in uploaded_files}
+        # Mapeia os arquivos por nome
+        files_dict = {f.name: f for f in uploaded_files}
         
-        # Permite ao usuário reordenar a lista selecionando a ordem dos nomes
+        # Inicializa a ordem no session_state ou atualiza se novos arquivos forem adicionados
+        if 'file_order' not in st.session_state or set(st.session_state.file_order) != set(files_dict.keys()):
+            st.session_state.file_order = list(files_dict.keys())
+            
         st.subheader("Ordene os arquivos:")
-        ordered_filenames = st.multiselect(
-            "Arraste ou selecione os arquivos na ordem exata em que devem ser unidos:",
-            options=list(files_dict.keys()),
-            default=list(files_dict.keys())  # Ordem padrão (ordem de envio)
-        )
         
-        # Recupera os objetos de arquivo na nova ordem escolhida
-        ordered_files = [files_dict[name] for name in ordered_filenames if name in files_dict]
-        
+        # Cria a lista com botões de reordenação
+        for idx, filename in enumerate(st.session_state.file_order):
+            col_name, col_up, col_down = st.columns([6, 1, 1])
+            
+            with col_name:
+                st.write(f"📄 **{idx + 1}.** {filename}")
+                
+            with col_up:
+                if st.button("⬆️", key=f"up_{idx}", disabled=(idx == 0)):
+                    # Troca a posição com o item acima
+                    st.session_state.file_order[idx], st.session_state.file_order[idx-1] = (
+                        st.session_state.file_order[idx-1], st.session_state.file_order[idx]
+                    )
+                    st.rerun()
+                    
+            with col_down:
+                if st.button("⬇️", key=f"down_{idx}", disabled=(idx == len(st.session_state.file_order) - 1)):
+                    # Troca a posição com o item abaixo
+                    st.session_state.file_order[idx], st.session_state.file_order[idx+1] = (
+                        st.session_state.file_order[idx+1], st.session_state.file_order[idx]
+                    )
+                    st.rerun()
+
+        st.divider()
         nome_arquivo = st.text_input("Digite o nome para o arquivo final:", value="pdf_unificado")
         
         if not nome_arquivo.endswith('.pdf'):
             nome_arquivo += '.pdf'
             
-        if ordered_files:
-            if st.button("Unificar PDFs"):
-                with st.spinner("Processando..."):
-                    final_pdf = unite_pdfs(ordered_files)
-                        
-                if final_pdf:
-                    st.download_button(
-                        label="📥 Baixar PDF Unificado",
-                        data=final_pdf.getvalue(),
-                        file_name=nome_arquivo,
-                        mime="application/pdf"
-                    )
-        else:
-            st.warning("Selecione pelo menos um arquivo na lista acima.")
+        # Pega a lista ordenada final
+        ordered_files = [files_dict[name] for name in st.session_state.file_order if name in files_dict]
+        
+        if st.button("🚀 Unificar PDFs"):
+            with st.spinner("Processando..."):
+                final_pdf = unite_pdfs(ordered_files)
+                    
+            if final_pdf:
+                st.download_button(
+                    label="📥 Baixar PDF Unificado",
+                    data=final_pdf.getvalue(),
+                    file_name=nome_arquivo,
+                    mime="application/pdf"
+                )
     else:
+        # Limpa o estado quando não houver arquivos
+        if 'file_order' in st.session_state:
+            del st.session_state['file_order']
         st.info("Aguardando o upload de arquivos PDF para começar.")
 
 #-----------------------------------------------------------------------------
