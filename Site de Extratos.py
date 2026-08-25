@@ -15,15 +15,13 @@ st.set_page_config(page_title="Gerenciador de Extratos Bancários e Unificador d
 #-----------------------------------------------------------------------------
 # Function to Unite PDFs:
 #-----------------------------------------------------------------------------
-def unite_pdfs(uploaded_files):
-    if not uploaded_files:
+def unite_pdfs(ordered_files):
+    if not ordered_files:
         return None
     
     writer = pypdf.PdfWriter()
     
-    sorted_files = sorted(uploaded_files, key=lambda x: x.name)
-    
-    for file in sorted_files:
+    for file in ordered_files:
         writer.append(file)
         
     output_pdf = BytesIO()
@@ -45,23 +43,39 @@ def interface_unite_pdfs():
     if uploaded_files:
         st.success(f"{len(uploaded_files)} arquivos carregados com sucesso!")
         
+        # Mapeia o nome do arquivo para o objeto de arquivo correspondente
+        files_dict = {file.name: file for file in uploaded_files}
+        
+        # Permite ao usuário reordenar a lista selecionando a ordem dos nomes
+        st.subheader("Ordene os arquivos:")
+        ordered_filenames = st.multiselect(
+            "Arraste ou selecione os arquivos na ordem exata em que devem ser unidos:",
+            options=list(files_dict.keys()),
+            default=list(files_dict.keys())  # Ordem padrão (ordem de envio)
+        )
+        
+        # Recupera os objetos de arquivo na nova ordem escolhida
+        ordered_files = [files_dict[name] for name in ordered_filenames if name in files_dict]
+        
         nome_arquivo = st.text_input("Digite o nome para o arquivo final:", value="pdf_unificado")
         
         if not nome_arquivo.endswith('.pdf'):
             nome_arquivo += '.pdf'
             
-        with st.spinner("Processando..."):
-            final_pdf = unite_pdfs(uploaded_files)
-                
-        if final_pdf:
-            pdf_bytes = final_pdf.getvalue() if hasattr(final_pdf, 'getvalue') else final_pdf
-            
-            st.download_button(
-                label="📥 Baixar PDF Unificado",
-                data=pdf_bytes,
-                file_name=nome_arquivo,
-                mime="application/pdf"
-            )
+        if ordered_files:
+            if st.button("Unificar PDFs"):
+                with st.spinner("Processando..."):
+                    final_pdf = unite_pdfs(ordered_files)
+                        
+                if final_pdf:
+                    st.download_button(
+                        label="📥 Baixar PDF Unificado",
+                        data=final_pdf.getvalue(),
+                        file_name=nome_arquivo,
+                        mime="application/pdf"
+                    )
+        else:
+            st.warning("Selecione pelo menos um arquivo na lista acima.")
     else:
         st.info("Aguardando o upload de arquivos PDF para começar.")
 
