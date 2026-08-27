@@ -34,86 +34,135 @@ def unite_pdfs(ordered_files):
 # Function of the Website Interface to Unite PDFs:
 #-----------------------------------------------------------------------------
 def interface_unite_pdfs():
+    # Inicializa a chave do uploader se não existir
+    if "uploader_key" not in st.session_state:
+        st.session_state.uploader_key = 0
+
     uploaded_files = st.file_uploader(
-        "Selecione ou arraste os arquivos PDF que deseja unificar", 
-        type="pdf", 
-        accept_multiple_files=True
+        "Selecione ou arraste os arquivos PDF que deseja unificar",
+        type="pdf",
+        accept_multiple_files=True,
+        key=f"pdf_uploader_{st.session_state.uploader_key}",
     )
-    
+
     if uploaded_files:
         st.success(f"{len(uploaded_files)} arquivos carregados com sucesso!")
-        
+
+        # Botão para limpar o upload e resetar a ordem dos arquivos
+        if st.button("🗑️ Limpar arquivos carregados"):
+            st.session_state.uploader_key += 1
+            if "file_order" in st.session_state:
+                del st.session_state["file_order"]
+            st.rerun()
+
         # Mapeia os arquivos por nome
         files_dict = {f.name: f for f in uploaded_files}
-        
+
         # Inicializa a ordem no session_state ou atualiza se novos arquivos forem adicionados
-        if 'file_order' not in st.session_state or set(st.session_state.file_order) != set(files_dict.keys()):
+        if "file_order" not in st.session_state or set(
+            st.session_state.file_order
+        ) != set(files_dict.keys()):
             st.session_state.file_order = list(files_dict.keys())
-            
+
         st.subheader("Ordene os arquivos:")
-        
+
         # Cria a lista com botões de reordenação
         for idx, filename in enumerate(st.session_state.file_order):
-            # Criamos 5 colunas: Nome do arquivo (6 partes) e 4 botões de ação (1 parte cada)
-            col_name, col_top, col_up, col_down, col_bottom = st.columns([6, 1, 1, 1, 1])
-            
+            col_name, col_top, col_up, col_down, col_bottom = st.columns(
+                [6, 1, 1, 1, 1]
+            )
+
             total_files = len(st.session_state.file_order)
-            is_first = (idx == 0)
-            is_last = (idx == total_files - 1)
-            
+            is_first = idx == 0
+            is_last = idx == total_files - 1
+
             with col_name:
                 st.write(f"📄 **{idx + 1}.** {filename}")
-                
+
             with col_top:
-                if st.button("🔝", key=f"top_{idx}", disabled=is_first, help="Mover para o topo"):
+                if st.button(
+                    "🔝",
+                    key=f"top_{idx}",
+                    disabled=is_first,
+                    help="Mover para o topo",
+                ):
                     item = st.session_state.file_order.pop(idx)
                     st.session_state.file_order.insert(0, item)
                     st.rerun()
-        
+
             with col_up:
-                if st.button("⬆️", key=f"up_{idx}", disabled=is_first, help="Subir uma posição"):
-                    st.session_state.file_order[idx], st.session_state.file_order[idx-1] = (
-                        st.session_state.file_order[idx-1], st.session_state.file_order[idx]
+                if st.button(
+                    "⬆️",
+                    key=f"up_{idx}",
+                    disabled=is_first,
+                    help="Subir uma posição",
+                ):
+                    (
+                        st.session_state.file_order[idx],
+                        st.session_state.file_order[idx - 1],
+                    ) = (
+                        st.session_state.file_order[idx - 1],
+                        st.session_state.file_order[idx],
                     )
                     st.rerun()
-                    
+
             with col_down:
-                if st.button("⬇️", key=f"down_{idx}", disabled=is_last, help="Descer uma posição"):
-                    st.session_state.file_order[idx], st.session_state.file_order[idx+1] = (
-                        st.session_state.file_order[idx+1], st.session_state.file_order[idx]
+                if st.button(
+                    "⬇️",
+                    key=f"down_{idx}",
+                    disabled=is_last,
+                    help="Descer uma posição",
+                ):
+                    (
+                        st.session_state.file_order[idx],
+                        st.session_state.file_order[idx + 1],
+                    ) = (
+                        st.session_state.file_order[idx + 1],
+                        st.session_state.file_order[idx],
                     )
                     st.rerun()
-        
+
             with col_bottom:
-                if st.button("🔚", key=f"bottom_{idx}", disabled=is_last, help="Mover para o fim"):
+                if st.button(
+                    "🔚",
+                    key=f"bottom_{idx}",
+                    disabled=is_last,
+                    help="Mover para o fim",
+                ):
                     item = st.session_state.file_order.pop(idx)
                     st.session_state.file_order.append(item)
                     st.rerun()
 
         st.divider()
-        nome_arquivo = st.text_input("Digite o nome para o arquivo final:", value="pdf_unificado")
-        
-        if not nome_arquivo.endswith('.pdf'):
-            nome_arquivo += '.pdf'
-            
+        nome_arquivo = st.text_input(
+            "Digite o nome para o arquivo final:", value="pdf_unificado"
+        )
+
+        if not nome_arquivo.endswith(".pdf"):
+            nome_arquivo += ".pdf"
+
         # Pega a lista ordenada final
-        ordered_files = [files_dict[name] for name in st.session_state.file_order if name in files_dict]
-        
+        ordered_files = [
+            files_dict[name]
+            for name in st.session_state.file_order
+            if name in files_dict
+        ]
+
         if st.button("🚀 Unificar PDFs"):
             with st.spinner("Processando..."):
                 final_pdf = unite_pdfs(ordered_files)
-                    
+
             if final_pdf:
                 st.download_button(
                     label="📥 Baixar PDF Unificado",
                     data=final_pdf.getvalue(),
                     file_name=nome_arquivo,
-                    mime="application/pdf"
+                    mime="application/pdf",
                 )
     else:
         # Limpa o estado quando não houver arquivos
-        if 'file_order' in st.session_state:
-            del st.session_state['file_order']
+        if "file_order" in st.session_state:
+            del st.session_state["file_order"]
         st.info("Aguardando o upload de arquivos PDF para começar.")
 
 #-----------------------------------------------------------------------------
