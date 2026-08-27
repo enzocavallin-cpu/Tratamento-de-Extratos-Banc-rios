@@ -746,48 +746,117 @@ def ce_cc(output_pdf):
 # Function to Create CE_IF from united pdf:
 #-----------------------------------------------------------------------------
 def ce_if(output_pdf):
-    
+
+    # No layout confirmado (extrato CEF de Fundo de Investimento), o campo
+    # "Mês/Ano" (ex.: 06/2020) fica no cabeçalho de cada página, ANTES do
+    # "Resumo da Movimentação" e da "Movimentação Detalhada" daquela mesma
+    # página — por isso a competência encontrada vale para tudo que vem
+    # depois dela, até o próximo marcador (modo "cabeçalho").
     pattern = (
     r'(\d{2}\s*\/\s*\d{2})\s+'
     r'([A-Za-zÀ-ÿ0-9\s\-\.\/\?]+?)\s+'
-    r'([\d\.]+[\,\.]\d{2})\s*' 
+    r'([\d\.]+[\,\.]\d{2})\s*'
     r'(D|C)'
     )
-    pattern_year = r'\s\d{2}(\/\d{4})\s'
+    # Dois grupos agora: mês (2 dígitos) e "/ano" — precisamos do mês para
+    # calcular o último dia da competência na linha de Rendimento Bruto.
+    pattern_year = r'\s(\d{2})(\/\d{4})\s'
+
+    # "Resumo da Movimentação": linhas sem data própria (Rendimento Bruto no
+    # Mês e Saldo Bruto = saldo final do mês), tratadas à parte do `pattern`
+    # de transações porque não têm "dd/mm" no início da linha.
+    pattern_rendimento = r'Rendimento\s+Bruto\s+no\s+M[eê]s\*?\s+([\d\.]+[\,\.]\d{2})\s*(D|C)'
+    pattern_saldo_bruto = r'Saldo\s+Bruto\*?\s+([\d\.]+[\,\.]\d{2})\s*(D|C)'
 
     data = []
+    eventos_globais = []  # (indice_pagina, posicao_no_texto, tipo, match)
 
     with pdfplumber.open(output_pdf) as pdf:
-        for page in pdf.pages:
+        for pagina_idx, page in enumerate(pdf.pages):
             page_text = page.extract_text()
             if not page_text:
                 continue
-        
-            matches_one = list(re.finditer(pattern, page_text))
-            if matches_one:
-                for match in matches_one:
-                    data.append({
-                        "Data": match.group(1),
-                        "Descrição": match.group(2).strip(),
-                        "Valor": match.group(3),
-                        "Natureza": match.group(4)
-                    })
-                    
 
-            matches_two = list(re.finditer(pattern_year, page_text))
-            if matches_two:
-                for match in matches_two:
-                    data.append({
-                        "Ano": match.group(1)
-                    })
+            # Em vez de separar "transações" e "marcadores de competência"
+            # em listas próprias e depois tentar recombiná-las com
+            # bfill/ffill, juntamos todos os tipos de evento e ordenamos
+            # pela posição real (match.start()) em que aparecem no texto da
+            # página. Isso preserva a ordem de leitura do PDF, mesmo quando
+            # um marcador de competência cai no meio da página (virada de
+            # mês) ou quando o Resumo aparece antes da Movimentação
+            # Detalhada.
+            for match in re.finditer(pattern, page_text):
+                eventos_globais.append((pagina_idx, match.start(), 'transacao', match))
+
+            for match in re.finditer(pattern_year, page_text):
+                eventos_globais.append((pagina_idx, match.start(), 'competencia', match))
+
+            # O Resumo da Movimentação aparece uma vez por página/mês (na
+            # página em que a competência é aberta). Só criamos o evento
+            # quando as duas informações são encontradas juntas na página.
+            match_rendimento = re.search(pattern_rendimento, page_text)
+            match_saldo = re.search(pattern_saldo_bruto, page_text)
+            if match_rendimento and match_saldo:
+                posicao = max(match_rendimento.start(), match_saldo.start())
+                eventos_globais.append(
+                    (pagina_idx, posicao, 'resumo', (match_rendimento, match_saldo))
+                )
+
+    # Ordena por página e, dentro da página, pela posição no texto.
+    eventos_globais.sort(key=lambda e: (e[0], e[1]))
+
+    competencia_mes = None        # ex: "06"
+    competencia_ano_sufixo = None  # ex: "/2020"
+
+    for _, _, tipo, match in eventos_globais:
+
+        if tipo == 'competencia':
+            competencia_mes = match.group(1)
+            competencia_ano_sufixo = match.group(2)
+
+        elif tipo == 'transacao':
+            data.append({
+                "Data": match.group(1),
+                "Descrição": match.group(2).strip(),
+                "Valor": match.group(3),
+                "Natureza": match.group(4),
+                "Rendimento": None,
+                "Ano": competencia_ano_sufixo,
+            })
+
+        elif tipo == 'resumo':
+            match_rendimento, match_saldo = match
+
+            data_resumo = None
+            if competencia_mes and competencia_ano_sufixo:
+                ano_num = int(competencia_ano_sufixo.replace('/', ''))
+                mes_num = int(competencia_mes)
+                ultimo_dia = calendar.monthrange(ano_num, mes_num)[1]
+                data_resumo = f"{ultimo_dia:02d}/{competencia_mes}"
+
+            valor_rendimento = float(
+                match_rendimento.group(1).replace('.', '').replace(',', '.')
+            )
+            if match_rendimento.group(2) == 'D':
+                valor_rendimento = -valor_rendimento
+
+            data.append({
+                "Data": data_resumo,
+                "Descrição": "Rendimento Bruto",
+                "Valor": match_saldo.group(1),      # saldo final do mês (Saldo Bruto)
+                "Natureza": match_saldo.group(2),
+                "Rendimento": valor_rendimento,
+                "Ano": competencia_ano_sufixo,
+            })
 
     investment_fund = pd.DataFrame(data)
 
-    investment_fund['Ano'] = investment_fund['Ano'].bfill()
-    investment_fund['Ano'] = investment_fund['Ano'].ffill(limit=1)
-    investment_fund = investment_fund.dropna(subset=['Descrição'])
+    if investment_fund.empty:
+        return investment_fund
+
+    investment_fund = investment_fund.dropna(subset=['Descrição', 'Data'])
     investment_fund['Data'] = (
-        investment_fund['Data'].astype(str).str.replace(' ', '') + 
+        investment_fund['Data'].astype(str).str.replace(' ', '') +
         investment_fund['Ano'].astype(str).str.strip()
     )
     investment_fund = investment_fund.drop(columns=['Ano'])
@@ -800,9 +869,15 @@ def ce_if(output_pdf):
     
     investment_fund['Valor'] = investment_fund['Valor'].str.replace('.', '').str.replace(',', '.')
     investment_fund['Valor'] = pd.to_numeric(investment_fund['Valor'], errors='coerce')
-    
-    investment_fund = investment_fund.sort_values(by='Data', ascending=True)   
-    
+
+    investment_fund = investment_fund.sort_values(by='Data', ascending=True)
+
+    # Coloca a coluna "Rendimento" logo ao lado de "Valor".
+    colunas = list(investment_fund.columns)
+    colunas.remove('Rendimento')
+    colunas.insert(colunas.index('Valor') + 1, 'Rendimento')
+    investment_fund = investment_fund[colunas]
+
     return investment_fund
     
 #-----------------------------------------------------------------------------
