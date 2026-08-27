@@ -3,6 +3,7 @@
 #----------------------------------------------------------------------------- 
 import streamlit as st
 import pypdf
+import io
 from io import BytesIO
 import re
 import pdfplumber
