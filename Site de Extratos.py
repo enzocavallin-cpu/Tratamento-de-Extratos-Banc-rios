@@ -760,7 +760,7 @@ def ce_if(output_pdf):
     pattern_saldo_bruto = r'Saldo\s+Bruto\*?\s+([\d\.]+[\,\.]\d{2})\s*(D|C)'
 
     data = []
-    eventos_globais = []  # (indice_pagina, posicao_no_texto, tipo, match)
+    eventos_globais = []
 
     with pdfplumber.open(output_pdf) as pdf:
         for pagina_idx, page in enumerate(pdf.pages):
@@ -856,9 +856,14 @@ def ce_if(output_pdf):
     investment_fund['Valor'] = investment_fund['Valor'].str.replace('.', '').str.replace(',', '.')
     investment_fund['Valor'] = pd.to_numeric(investment_fund['Valor'], errors='coerce')
 
-    investment_fund = investment_fund.sort_values(by='Data', ascending=True)
+    investment_fund['prioridade_ordenacao'] = np.where(
+        investment_fund['Descrição'] == 'Rendimento Bruto', 1, 0
+    )
+    investment_fund = investment_fund.sort_values(
+        by=['Data', 'prioridade_ordenacao'], ascending=[True, True]
+    )
+    investment_fund = investment_fund.drop(columns=['prioridade_ordenacao'])
 
-    # Coloca a coluna "Rendimento" logo ao lado de "Valor".
     colunas = list(investment_fund.columns)
     colunas.remove('Rendimento')
     colunas.insert(colunas.index('Valor') + 1, 'Rendimento')
