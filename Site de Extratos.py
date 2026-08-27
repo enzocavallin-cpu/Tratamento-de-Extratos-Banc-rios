@@ -8,7 +8,7 @@ import re
 import pdfplumber
 import pandas as pd
 import numpy as np
-import hashlib
+from pypdf import PdfReader, PdfWriter
 
 st.set_page_config(page_title="Gerenciador de Extratos Bancários e Unificador de PDFs", page_icon="📄")
 
@@ -29,6 +29,58 @@ def unite_pdfs(ordered_files):
     output_pdf.seek(0)
     
     return output_pdf
+
+#-----------------------------------------------------------------------------
+# Function to Divide PDFs:
+#-----------------------------------------------------------------------------
+
+def interface_split_pdfs():
+    uploaded_file = st.file_uploader(
+        "Selecione o arquivo PDF que deseja dividir", type="pdf"
+    )
+
+    if uploaded_file:
+        reader = PdfReader(uploaded_file)
+        total_pages = len(reader.pages)
+        st.info(f"O arquivo contém {total_pages} página(s).")
+
+        modo = st.radio(
+            "Selecione como deseja dividir:",
+            ["Extrair Páginas Específicas", "Separar Todas as Páginas em Zip"],
+        )
+
+        if modo == "Extrair Páginas Específicas":
+            paginas_str = st.text_input(
+                "Digite as páginas a extrair (ex: 1, 3, 5-8):", value="1"
+            )
+
+            if st.button("✂️ Extrair Páginas"):
+                # Lógica para ler e salvar as páginas selecionadas
+                writer = PdfWriter()
+                # Exemplo simples extraindo de um intervalo selecionado
+                try:
+                    # Exemplo extraindo página individual ou lista
+                    pages_to_keep = [
+                        int(p.strip()) - 1
+                        for p in paginas_str.split(",")
+                        if p.strip().isdigit()
+                    ]
+                    for p in pages_to_keep:
+                        if 0 <= p < total_pages:
+                            writer.add_page(reader.pages[p])
+
+                    output_pdf = io.BytesIO()
+                    writer.write(output_pdf)
+                    output_pdf.seek(0)
+
+                    st.download_button(
+                        label="📥 Baixar PDF Dividido",
+                        data=output_pdf,
+                        file_name="pdf_dividido.pdf",
+                        mime="application/pdf",
+                    )
+                except Exception as e:
+                    st.error(f"Erro ao processar as páginas: {e}")
 
 #-----------------------------------------------------------------------------
 # Function of the Website Interface to Unite PDFs:
@@ -811,7 +863,7 @@ if st.session_state.step == 1:
     
     choice = st.radio(
         "Selecione uma opção para continuar:",
-        ['Unir PDFs', 'Planilhar Extratos Bancários']
+        ['Unir PDFs', "Dividir PDFs", 'Planilhar Extratos Bancários']
     )
     
     if st.button("Confirmar Escolha ➡️"):
@@ -819,20 +871,25 @@ if st.session_state.step == 1:
         st.session_state.step = 2
         st.rerun()
 
-#-----------------------------------------------------------------------------
-# Choosing the Bank and Type of Bank Extract:
-#-----------------------------------------------------------------------------
-    
+# -----------------------------------------------------------------------------
+# Choosing the Bank and Type of Bank Extract or PDF tools:
+# -----------------------------------------------------------------------------
+
 if st.session_state.step == 2:
-    
+
     if st.button("🔙 Voltar ao Menu Principal"):
         return_start()
-        
+
     st.divider()
 
-    if st.session_state.main_choice == 'Unir PDFs':
+    if st.session_state.main_choice == "Unir PDFs":
         st.header("📄 Unificador de Arquivos PDF")
         interface_unite_pdfs()
+
+    elif st.session_state.main_choice == "Dividir PDFs":
+        st.header("✂️ Divisor de Arquivos PDF")
+        # Chama a função de interface para dividir PDFs
+        interface_split_pdfs()
 
     elif st.session_state.main_choice == "Planilhar Extratos Bancários":
 
@@ -840,30 +897,22 @@ if st.session_state.step == 2:
 
         second_choice = st.selectbox(
             "Selecione o Banco:",
-            [
-                "Banco do Brasil",
-                "Caixa Econômica Federal"
-            ]
+            ["Banco do Brasil", "Caixa Econômica Federal"],
         )
 
         third_choice = st.selectbox(
             "Selecione o tipo de extrato:",
-            [
-                "Conta Corrente",
-                "Conta Poupança",
-                "Fundo de Investimento"
-            ]
+            ["Conta Corrente", "Conta Poupança", "Fundo de Investimento"],
         )
 
         st.info(
-            f"Configuração selecionada: "
-            f"{second_choice} ({third_choice})"
+            f"Configuração selecionada: {second_choice} ({third_choice})"
         )
 
         extract_files = st.file_uploader(
             f"Arraste os PDFs dos extratos de {third_choice} aqui",
             type="pdf",
-            accept_multiple_files=True
+            accept_multiple_files=True,
         )
 
         if extract_files:
@@ -881,55 +930,43 @@ if st.session_state.step == 2:
                 and third_choice == "Conta Corrente"
             ):
 
-                with st.spinner(
-                    "Extraindo e normalizando dados do extrato..."
-                ):
+                with st.spinner("Extraindo e normalizando dados do extrato..."):
                     output_pdf = unite_pdfs(extract_files)
                     account = bb_cc(output_pdf)
-
 
             elif (
                 second_choice == "Banco do Brasil"
                 and third_choice == "Conta Poupança"
             ):
 
-                with st.spinner(
-                    "Extraindo e normalizando dados do extrato..."
-                ):
+                with st.spinner("Extraindo e normalizando dados do extrato..."):
                     output_pdf = unite_pdfs(extract_files)
                     account = bb_cp(output_pdf)
-
 
             elif (
                 second_choice == "Banco do Brasil"
                 and third_choice == "Fundo de Investimento"
             ):
 
-                with st.spinner(
-                    "Extraindo e normalizando dados do extrato..."
-                ):
+                with st.spinner("Extraindo e normalizando dados do extrato..."):
                     output_pdf = unite_pdfs(extract_files)
                     account = bb_if(output_pdf)
-            
+
             elif (
-                    second_choice == "Caixa Econômica Federal"
-                    and third_choice == "Conta Corrente"
-                ):
+                second_choice == "Caixa Econômica Federal"
+                and third_choice == "Conta Corrente"
+            ):
                 output_pdf = unite_pdfs(extract_files)
                 account = ce_cc(output_pdf)
-
 
             elif (
                 second_choice == "Caixa Econômica Federal"
                 and third_choice == "Fundo de Investimento"
             ):
 
-                with st.spinner(
-                    "Extraindo e normalizando dados do extrato..."
-                ):
+                with st.spinner("Extraindo e normalizando dados do extrato..."):
                     output_pdf = unite_pdfs(extract_files)
                     account = ce_if(output_pdf)
-
 
             else:
 
@@ -938,8 +975,11 @@ if st.session_state.step == 2:
                     f"para {second_choice} + {third_choice}."
                 )
 
-
-            if isinstance(account, pd.DataFrame) and not account.empty and len(account.columns) > 0:
+            if (
+                isinstance(account, pd.DataFrame)
+                and not account.empty
+                and len(account.columns) > 0
+            ):
 
                 account = final_extract(account)
 
@@ -950,24 +990,20 @@ if st.session_state.step == 2:
                 )
 
                 nome_base = st.text_input(
-                    "Digite o nome para o arquivo final "
-                    "(sem extensão):",
-                    value=nome_padrao
+                    "Digite o nome para o arquivo final (sem extensão):",
+                    value=nome_padrao,
                 )
 
                 output_excel = BytesIO()
 
                 with pd.ExcelWriter(
-                    output_excel,
-                    engine="xlsxwriter"
+                    output_excel, engine="xlsxwriter"
                 ) as writer:
-                
+
                     account.to_excel(
-                        writer,
-                        index=False,
-                        sheet_name="Extrato_Tratado"
+                        writer, index=False, sheet_name="Extrato_Tratado"
                     )
-                
+
                 output_excel.seek(0)
 
                 if output_pdf is not None:
@@ -982,7 +1018,7 @@ if st.session_state.step == 2:
                     mime=(
                         "application/vnd.openxmlformats-officedocument."
                         "spreadsheetml.sheet"
-                    )
+                    ),
                 )
 
                 if output_pdf is not None:
@@ -991,7 +1027,7 @@ if st.session_state.step == 2:
                         label="📄 Baixar Cópia do PDF Unificado (.pdf)",
                         data=output_pdf,
                         file_name=f"{nome_base}_unificado.pdf",
-                        mime="application/pdf"
+                        mime="application/pdf",
                     )
 
             elif account is not None:
