@@ -748,24 +748,14 @@ def ce_cc(output_pdf):
 #-----------------------------------------------------------------------------
 def ce_if(output_pdf):
 
-    # No layout confirmado (extrato CEF de Fundo de Investimento), o campo
-    # "Mês/Ano" (ex.: 06/2020) fica no cabeçalho de cada página, ANTES do
-    # "Resumo da Movimentação" e da "Movimentação Detalhada" daquela mesma
-    # página — por isso a competência encontrada vale para tudo que vem
-    # depois dela, até o próximo marcador (modo "cabeçalho").
     pattern = (
     r'(\d{2}\s*\/\s*\d{2})\s+'
     r'([A-Za-zÀ-ÿ0-9\s\-\.\/\?]+?)\s+'
     r'([\d\.]+[\,\.]\d{2})\s*'
     r'(D|C)'
     )
-    # Dois grupos agora: mês (2 dígitos) e "/ano" — precisamos do mês para
-    # calcular o último dia da competência na linha de Rendimento Bruto.
     pattern_year = r'\s(\d{2})(\/\d{4})\s'
 
-    # "Resumo da Movimentação": linhas sem data própria (Rendimento Bruto no
-    # Mês e Saldo Bruto = saldo final do mês), tratadas à parte do `pattern`
-    # de transações porque não têm "dd/mm" no início da linha.
     pattern_rendimento = r'Rendimento\s+Bruto\s+no\s+M[eê]s\*?\s+([\d\.]+[\,\.]\d{2})\s*(D|C)'
     pattern_saldo_bruto = r'Saldo\s+Bruto\*?\s+([\d\.]+[\,\.]\d{2})\s*(D|C)'
 
@@ -778,23 +768,12 @@ def ce_if(output_pdf):
             if not page_text:
                 continue
 
-            # Em vez de separar "transações" e "marcadores de competência"
-            # em listas próprias e depois tentar recombiná-las com
-            # bfill/ffill, juntamos todos os tipos de evento e ordenamos
-            # pela posição real (match.start()) em que aparecem no texto da
-            # página. Isso preserva a ordem de leitura do PDF, mesmo quando
-            # um marcador de competência cai no meio da página (virada de
-            # mês) ou quando o Resumo aparece antes da Movimentação
-            # Detalhada.
             for match in re.finditer(pattern, page_text):
                 eventos_globais.append((pagina_idx, match.start(), 'transacao', match))
 
             for match in re.finditer(pattern_year, page_text):
                 eventos_globais.append((pagina_idx, match.start(), 'competencia', match))
 
-            # O Resumo da Movimentação aparece uma vez por página/mês (na
-            # página em que a competência é aberta). Só criamos o evento
-            # quando as duas informações são encontradas juntas na página.
             match_rendimento = re.search(pattern_rendimento, page_text)
             match_saldo = re.search(pattern_saldo_bruto, page_text)
             if match_rendimento and match_saldo:
@@ -803,11 +782,11 @@ def ce_if(output_pdf):
                     (pagina_idx, posicao, 'resumo', (match_rendimento, match_saldo))
                 )
 
-    # Ordena por página e, dentro da página, pela posição no texto.
     eventos_globais.sort(key=lambda e: (e[0], e[1]))
 
-    competencia_mes = None        # ex: "06"
-    competencia_ano_sufixo = None  # ex: "/2020"
+    competencia_mes = None
+    competencia_ano_sufixo = None
+    competencias_com_resumo = set()
 
     for _, _, tipo, match in eventos_globais:
 
@@ -826,6 +805,11 @@ def ce_if(output_pdf):
             })
 
         elif tipo == 'resumo':
+            chave_competencia = (competencia_mes, competencia_ano_sufixo)
+
+            if chave_competencia in competencias_com_resumo:
+                continue
+
             match_rendimento, match_saldo = match
 
             data_resumo = None
@@ -844,11 +828,12 @@ def ce_if(output_pdf):
             data.append({
                 "Data": data_resumo,
                 "Descrição": "Rendimento Bruto",
-                "Valor": match_saldo.group(1),      # saldo final do mês (Saldo Bruto)
+                "Valor": match_saldo.group(1),
                 "Natureza": match_saldo.group(2),
                 "Rendimento": valor_rendimento,
                 "Ano": competencia_ano_sufixo,
             })
+            competencias_com_resumo.add(chave_competencia)
 
     investment_fund = pd.DataFrame(data)
 
