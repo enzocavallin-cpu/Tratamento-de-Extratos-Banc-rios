@@ -924,25 +924,19 @@ def ce_cp(output_pdf):
 
                 for match in re.finditer(pattern_sihex, texto_ordenado):
                     registrar({
-                        "Data": match.group(1),
-                        "Documento": match.group(2),
+                        "Data": match.group(1),                        
                         "Descrição": match.group(3).strip(),
                         "Valor": match.group(4),
-                        "Natureza": match.group(5),
-                        "Saldo": match.group(6),
-                        "Natureza_Saldo": match.group(7),
+                        "Natureza": match.group(5)                        
                     })
             else:
                 # Formato "auto atendimento": uma coluna só.
                 for match in re.finditer(pattern_atm, page_text):
                     registrar({
-                        "Data": match.group(1),
-                        "Documento": match.group(2),
+                        "Data": match.group(1),                       
                         "Descrição": match.group(3).strip(),
                         "Valor": match.group(5),
-                        "Natureza": match.group(6),
-                        "Saldo": match.group(7),
-                        "Natureza_Saldo": match.group(8),
+                        "Natureza": match.group(6)
                     })
 
     savings_account = pd.DataFrame(data)
