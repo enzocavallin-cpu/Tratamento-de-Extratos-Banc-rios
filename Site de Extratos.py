@@ -1104,7 +1104,7 @@ def ce_cp(output_pdf):
     savings_account['Descrição'] = savings_account['Descrição'].str.replace('Rendimento', 'Saldo Final')
     
     condition = savings_account['Descrição'] == 'Saldo Final'
-    savings_account['Data'] = savings_account['Data'].mask(condition, savings_account['Data'] + pd.Timedelta(days=30))
+    savings_account['Data'] = savings_account['Data'].mask(condition, savings_account['Data'] + pd.Timedelta(days=29))
 
     return savings_account
 
