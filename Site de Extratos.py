@@ -1098,7 +1098,7 @@ def ce_cp(output_pdf):
     savings_account = savings_account.drop(columns=['prioridade_ordenacao'])
 
     savings_account = savings_account[
-        ['Data', 'Documento', 'Descrição', 'Valor', 'Rendimento', 'Natureza', 'Saldo', 'Natureza_Saldo']
+        ['Data', 'Descrição', 'Valor', 'Rendimento', 'Natureza', 'Saldo', 'Natureza_Saldo']
     ]
 
     return savings_account
