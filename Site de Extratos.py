@@ -7,6 +7,7 @@ import io
 from io import BytesIO
 import re
 import calendar
+import zipfile
 import pdfplumber
 import pandas as pd
 import numpy as np
@@ -57,32 +58,112 @@ def interface_split_pdfs():
             )
 
             if st.button("✂️ Extrair Páginas"):
-                # Lógica para ler e salvar as páginas selecionadas
-                writer = PdfWriter()
-                # Exemplo simples extraindo de um intervalo selecionado
                 try:
-                    # Exemplo extraindo página individual ou lista
-                    pages_to_keep = [
-                        int(p.strip()) - 1
-                        for p in paginas_str.split(",")
-                        if p.strip().isdigit()
-                    ]
+                    # Cada item pode ser um número solto ("3") ou um
+                    # intervalo ("5-8"). Itens que não se encaixam em
+                    # nenhum dos dois formatos são reportados ao usuário
+                    # em vez de serem descartados em silêncio.
+                    pages_to_keep = []
+                    itens_invalidos = []
+
+                    for item in paginas_str.split(","):
+                        item = item.strip()
+                        if not item:
+                            continue
+
+                        if "-" in item:
+                            inicio_str, _, fim_str = item.partition("-")
+                            inicio_str, fim_str = inicio_str.strip(), fim_str.strip()
+                            if inicio_str.isdigit() and fim_str.isdigit():
+                                inicio, fim = int(inicio_str), int(fim_str)
+                                if inicio > fim:
+                                    inicio, fim = fim, inicio
+                                pages_to_keep.extend(range(inicio - 1, fim))
+                            else:
+                                itens_invalidos.append(item)
+                        elif item.isdigit():
+                            pages_to_keep.append(int(item) - 1)
+                        else:
+                            itens_invalidos.append(item)
+
+                    if itens_invalidos:
+                        st.warning(
+                            "Não entendi estas entradas e vou ignorá-las: "
+                            + ", ".join(itens_invalidos)
+                        )
+
+                    # Remove duplicadas (mantendo a ordem) e separa páginas
+                    # que não existem no PDF, para avisar em vez de ignorar
+                    # sem dizer nada.
+                    vistas = set()
+                    pages_validas = []
+                    pages_fora_do_intervalo = []
                     for p in pages_to_keep:
+                        if p in vistas:
+                            continue
+                        vistas.add(p)
                         if 0 <= p < total_pages:
+                            pages_validas.append(p)
+                        else:
+                            pages_fora_do_intervalo.append(p + 1)
+
+                    if pages_fora_do_intervalo:
+                        st.warning(
+                            f"Este PDF só tem {total_pages} página(s); "
+                            "estas páginas não existem e foram ignoradas: "
+                            + ", ".join(str(p) for p in sorted(pages_fora_do_intervalo))
+                        )
+
+                    if not pages_validas:
+                        st.error(
+                            "Nenhuma página válida foi informada — "
+                            "verifique o texto digitado."
+                        )
+                    else:
+                        writer = PdfWriter()
+                        for p in pages_validas:
                             writer.add_page(reader.pages[p])
 
-                    output_pdf = io.BytesIO()
-                    writer.write(output_pdf)
-                    output_pdf.seek(0)
+                        output_pdf = io.BytesIO()
+                        writer.write(output_pdf)
+                        output_pdf.seek(0)
 
-                    st.download_button(
-                        label="📥 Baixar PDF Dividido",
-                        data=output_pdf,
-                        file_name="pdf_dividido.pdf",
-                        mime="application/pdf",
-                    )
+                        st.download_button(
+                            label="📥 Baixar PDF Dividido",
+                            data=output_pdf,
+                            file_name="pdf_dividido.pdf",
+                            mime="application/pdf",
+                        )
                 except Exception as e:
                     st.error(f"Erro ao processar as páginas: {e}")
+
+        elif modo == "Separar Todas as Páginas em Zip":
+            if st.button("📦 Separar Todas as Páginas"):
+                try:
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+                        for i in range(total_pages):
+                            page_writer = PdfWriter()
+                            page_writer.add_page(reader.pages[i])
+
+                            page_buffer = io.BytesIO()
+                            page_writer.write(page_buffer)
+                            page_buffer.seek(0)
+
+                            zip_file.writestr(
+                                f"pagina_{i + 1}.pdf", page_buffer.getvalue()
+                            )
+
+                    zip_buffer.seek(0)
+
+                    st.download_button(
+                        label="📥 Baixar Páginas Separadas (.zip)",
+                        data=zip_buffer,
+                        file_name="paginas_separadas.zip",
+                        mime="application/zip",
+                    )
+                except Exception as e:
+                    st.error(f"Erro ao separar as páginas: {e}")
 
 #-----------------------------------------------------------------------------
 # Function of the Website Interface to Unite PDFs:
@@ -885,10 +966,60 @@ def ce_cp(output_pdf):
     )
     savings_account['Saldo'] = pd.to_numeric(savings_account['Saldo'], errors='coerce')
 
-    savings_account = savings_account.sort_values(by='Data', ascending=True)
+    # O rendimento mensal da poupança sai em 2 lançamentos separados, no
+    # mesmo dia: "Remuneração Básica" (TR) e "Crédito de Juros" (a parte
+    # que rende de fato). A exemplo do que foi feito em ce_if, adicionamos
+    # uma linha extra "Rendimento" (sem remover as duas linhas originais,
+    # que continuam no extrato como lançamentos próprios) com o total dos
+    # dois componentes numa coluna "Rendimento" ao lado do Valor, e o saldo
+    # resultante do crédito de juros como Valor/Saldo dessa linha.
+    savings_account['Rendimento'] = np.nan
+
+    componentes_rendimento = savings_account[
+        savings_account['Descrição'].isin(['Remuneração Básica', 'Crédito de Juros'])
+    ]
+
+    linhas_rendimento = []
+    for (data_credito, documento), grupo in componentes_rendimento.groupby(['Data', 'Documento']):
+        soma_rendimento = grupo['Valor'].sum()
+
+        linha_juros = grupo[grupo['Descrição'] == 'Crédito de Juros']
+        if not linha_juros.empty and pd.notna(linha_juros.iloc[0]['Saldo']):
+            saldo_final = linha_juros.iloc[0]['Saldo']
+            natureza_saldo = linha_juros.iloc[0]['Natureza_Saldo']
+        else:
+            saldo_final = None
+            natureza_saldo = None
+
+        linhas_rendimento.append({
+            "Data": data_credito,
+            "Documento": documento,
+            "Descrição": "Rendimento",
+            "Valor": saldo_final,
+            "Natureza": "C",
+            "Saldo": saldo_final,
+            "Natureza_Saldo": natureza_saldo,
+            "Rendimento": soma_rendimento,
+        })
+
+    if linhas_rendimento:
+        savings_account = pd.concat(
+            [savings_account, pd.DataFrame(linhas_rendimento)], ignore_index=True
+        )
+
+    # "Rendimento" cai no mesmo dia dos seus 2 componentes; esta prioridade
+    # garante que ele fique depois deles nesse dia (mesma lógica usada em
+    # ce_if para o "Rendimento Bruto").
+    savings_account['prioridade_ordenacao'] = np.where(
+        savings_account['Descrição'] == 'Rendimento', 1, 0
+    )
+    savings_account = savings_account.sort_values(
+        by=['Data', 'prioridade_ordenacao'], ascending=[True, True]
+    )
+    savings_account = savings_account.drop(columns=['prioridade_ordenacao'])
 
     savings_account = savings_account[
-        ['Data', 'Documento', 'Descrição', 'Valor', 'Natureza', 'Saldo', 'Natureza_Saldo']
+        ['Data', 'Documento', 'Descrição', 'Valor', 'Rendimento', 'Natureza', 'Saldo', 'Natureza_Saldo']
     ]
 
     return savings_account
