@@ -676,9 +676,88 @@ def bb_cp(output_pdf):
                     })
 
     saving_account = pd.DataFrame(data)
-    
-    
-    
+
+    if saving_account.empty:
+        return saving_account
+
+    # A poupança calcula o rendimento mensal em 2 componentes lançados no
+    # mesmo dia — TR (Remuneração Básica) e juros (Crédito de Juros) —,
+    # terminologia padronizada pelo Banco Central e igual à usada no
+    # extrato da CAIXA (ce_cp). Normaliza esses 2 códigos para poder
+    # agrupá-los mais abaixo; outros históricos ficam como estavam.
+    normalizacao_rendimento = {
+        'REM BASICA': 'Remuneração Básica',
+        'CRED JUROS': 'Crédito de Juros',
+    }
+    saving_account['Descrição'] = saving_account['Descrição'].replace(normalizacao_rendimento)
+
+    # Diferente do extrato de poupança da CAIXA, o do BB não imprime um
+    # saldo em cada linha — por isso o saldo aqui é acumulado (soma do
+    # valor com sinal, na ordem em que os lançamentos aparecem no
+    # extrato), do mesmo jeito que é feito em bb_cc. Isso também exige
+    # converter Data e Valor para tipos numéricos/data antes de calcular.
+    saving_account['Data'] = pd.to_datetime(saving_account['Data'], format='%d/%m/%Y', errors='coerce')
+
+    saving_account['Valor'] = (
+        saving_account['Valor'].str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+    )
+    saving_account['Valor'] = pd.to_numeric(saving_account['Valor'], errors='coerce')
+
+    # Ordenação estável: mantém a ordem original de leitura do PDF entre
+    # lançamentos do mesmo dia, para o saldo acumulado ficar correto.
+    saving_account = saving_account.sort_values(by='Data', kind='stable', ascending=True)
+
+    valores_sinalizados = np.where(
+        saving_account['Natureza'] == 'C', saving_account['Valor'], -saving_account['Valor']
+    )
+    saving_account['Saldo'] = valores_sinalizados.cumsum()
+
+    # Rendimento mensal = Remuneração Básica + Crédito de Juros do mesmo
+    # dia. A exemplo do que foi feito em ce_cp, cria uma linha extra
+    # "Rendimento" com a soma dos dois (sem remover as linhas originais)
+    # e o saldo acumulado já refletindo os dois lançamentos.
+    saving_account['Rendimento'] = np.nan
+
+    componentes_rendimento = saving_account[
+        saving_account['Descrição'].isin(['Remuneração Básica', 'Crédito de Juros'])
+    ]
+
+    linhas_rendimento = []
+    for data_credito, grupo in componentes_rendimento.groupby('Data'):
+        linhas_rendimento.append({
+            "Data": data_credito,
+            "Documento": grupo['Documento'].iloc[-1],
+            "Descrição": "Rendimento",
+            "Natureza": "C",
+            "Valor": grupo['Valor'].sum(),
+            # Saldo do último lançamento do grupo na ordem de leitura do
+            # PDF: como o cumsum já é cumulativo, esse valor já reflete os
+            # 2 componentes somados, independentemente de qual dos dois
+            # veio primeiro no extrato.
+            "Saldo": grupo['Saldo'].iloc[-1],
+            "Rendimento": grupo['Valor'].sum(),
+        })
+
+    if linhas_rendimento:
+        saving_account = pd.concat(
+            [saving_account, pd.DataFrame(linhas_rendimento)], ignore_index=True
+        )
+
+    # "Rendimento" cai no mesmo dia dos seus 2 componentes; esta prioridade
+    # garante que ele fique depois deles nesse dia (mesma lógica usada em
+    # ce_if/ce_cp).
+    saving_account['prioridade_ordenacao'] = np.where(
+        saving_account['Descrição'] == 'Rendimento', 1, 0
+    )
+    saving_account = saving_account.sort_values(
+        by=['Data', 'prioridade_ordenacao'], kind='stable', ascending=[True, True]
+    )
+    saving_account = saving_account.drop(columns=['prioridade_ordenacao'])
+
+    saving_account = saving_account[
+        ['Data', 'Documento', 'Descrição', 'Natureza', 'Valor', 'Rendimento', 'Saldo']
+    ]
+
     return saving_account
 
 #-----------------------------------------------------------------------------
@@ -924,19 +1003,25 @@ def ce_cp(output_pdf):
 
                 for match in re.finditer(pattern_sihex, texto_ordenado):
                     registrar({
-                        "Data": match.group(1),                        
+                        "Data": match.group(1),
+                        "Documento": match.group(2),
                         "Descrição": match.group(3).strip(),
                         "Valor": match.group(4),
-                        "Natureza": match.group(5)                        
+                        "Natureza": match.group(5),
+                        "Saldo": match.group(6),
+                        "Natureza_Saldo": match.group(7),
                     })
             else:
                 # Formato "auto atendimento": uma coluna só.
                 for match in re.finditer(pattern_atm, page_text):
                     registrar({
-                        "Data": match.group(1),                       
+                        "Data": match.group(1),
+                        "Documento": match.group(2),
                         "Descrição": match.group(3).strip(),
                         "Valor": match.group(5),
-                        "Natureza": match.group(6)
+                        "Natureza": match.group(6),
+                        "Saldo": match.group(7),
+                        "Natureza_Saldo": match.group(8),
                     })
 
     savings_account = pd.DataFrame(data)
