@@ -1102,7 +1102,7 @@ def ce_cp(output_pdf):
     ]
 
     savings_account['Descrição'] = savings_account['Descrição'].str.replace('Rendimento', 'Saldo Final')
-    savings_account = savings_account.reset_index()
+    
 
     return savings_account
 
