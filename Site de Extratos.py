@@ -742,6 +742,117 @@ def ce_cc(output_pdf):
     checking_account = checking_account[['Data', 'Documento', 'Descrição', 'Natureza', 'Valor', 'Saldo']]
    
     return checking_account
+#-----------------------------------------------------------------------------
+# Function to Create CE_CP from united pdf:
+#-----------------------------------------------------------------------------
+pattern_sihex = (
+        r'(\d{2}/\d{2}/\d{4})\s+'          # Data
+        r'(\d+)\s+'                         # Nr. Doc.
+        r'([A-Za-zÀ-ÿ\s]+?)\s+'             # Histórico
+        r'([\d\.]+,\d{2})\s*'               # Valor
+        r'(D|C)'                            # Natureza do valor
+        r'(?:\s+([\d\.]+,\d{2})\s*(D|C))?'  # Saldo + Natureza (opcional)
+    )
+
+    pattern_atm = (
+        r'(\d{2}/\d{2}/\d{4})\s+'   # Data
+        r'(\d+)\s+'                  # Nr. Doc.
+        r'([A-Za-zÀ-ÿ\s]+?)\s+'      # Histórico
+        r'([\d\.]+,\d+)\s+'          # Taxa
+        r'([\d\.]+,\d{2})\s*'        # Valor
+        r'(D|C)\s+'                  # Natureza do valor
+        r'([\d\.]+,\d{2})\s*'        # Saldo
+        r'(D|C)'                     # Natureza do saldo
+    )
+
+    normalizacao_historico = {
+        'CRPCV POUP': 'Crédito de Pagamento de Convênio via Poupança',
+        'DBPCV POUP': 'Débito de Pagamento de Convênio via Poupança',
+        'REM BASICA': 'Remuneração Básica',
+        'CRED JUROS': 'Crédito de Juros',
+    }
+
+    data = []
+    ultimo_lancamento = None
+
+    def registrar(lancamento):
+        # Ignora reimpressão exata e consecutiva (divergência de saldo).
+        nonlocal ultimo_lancamento
+        if lancamento == ultimo_lancamento:
+            return
+        data.append(lancamento)
+        ultimo_lancamento = lancamento
+
+    with pdfplumber.open(output_pdf) as pdf:
+        for page in pdf.pages:
+            page_text = page.extract_text()
+            if not page_text or not page_text.strip():
+                continue
+
+            if 'SIHEX' in page_text:
+                # Layout em 2 colunas: recorta a página ao meio e lê cada
+                # metade separadamente, na ordem esquerda -> direita, para
+                # não embaralhar os blocos mensais.
+                largura, altura = page.width, page.height
+                coluna_esquerda = page.within_bbox((0, 0, largura * 0.495, altura))
+                coluna_direita = page.within_bbox((largura * 0.495, 0, largura, altura))
+
+                texto_ordenado = (
+                    (coluna_esquerda.extract_text() or '') + '\n' +
+                    (coluna_direita.extract_text() or '')
+                )
+
+                for match in re.finditer(pattern_sihex, texto_ordenado):
+                    registrar({
+                        "Data": match.group(1),
+                        "Documento": match.group(2),
+                        "Descrição": match.group(3).strip(),
+                        "Valor": match.group(4),
+                        "Natureza": match.group(5),
+                        "Saldo": match.group(6),
+                        "Natureza_Saldo": match.group(7),
+                    })
+            else:
+                # Formato "auto atendimento": uma coluna só.
+                for match in re.finditer(pattern_atm, page_text):
+                    registrar({
+                        "Data": match.group(1),
+                        "Documento": match.group(2),
+                        "Descrição": match.group(3).strip(),
+                        "Valor": match.group(5),
+                        "Natureza": match.group(6),
+                        "Saldo": match.group(7),
+                        "Natureza_Saldo": match.group(8),
+                    })
+
+    savings_account = pd.DataFrame(data)
+
+    if savings_account.empty:
+        return savings_account
+
+    savings_account['Descrição'] = (
+        savings_account['Descrição'].map(normalizacao_historico).fillna(savings_account['Descrição'])
+    )
+
+    savings_account['Data'] = pd.to_datetime(savings_account['Data'], format='%d/%m/%Y', errors='coerce')
+
+    savings_account['Valor'] = (
+        savings_account['Valor'].str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+    )
+    savings_account['Valor'] = pd.to_numeric(savings_account['Valor'], errors='coerce')
+
+    savings_account['Saldo'] = (
+        savings_account['Saldo'].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+    )
+    savings_account['Saldo'] = pd.to_numeric(savings_account['Saldo'], errors='coerce')
+
+    savings_account = savings_account.sort_values(by='Data', ascending=True)
+
+    savings_account = savings_account[
+        ['Data', 'Documento', 'Descrição', 'Valor', 'Natureza', 'Saldo', 'Natureza_Saldo']
+    ]
+
+    return savings_account
 
 #-----------------------------------------------------------------------------
 # Function to Create CE_IF from united pdf:
