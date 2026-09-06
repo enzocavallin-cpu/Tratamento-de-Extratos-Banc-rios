@@ -1139,6 +1139,15 @@ if st.session_state.step == 2:
 
             elif (
                 second_choice == "Caixa Econômica Federal"
+                and third_choice == "Conta Poupança"
+            ):
+
+                with st.spinner("Extraindo e normalizando dados do extrato..."):
+                    output_pdf = unite_pdfs(extract_files)
+                    account = ce_cp(output_pdf)
+
+            elif (
+                second_choice == "Caixa Econômica Federal"
                 and third_choice == "Fundo de Investimento"
             ):
 
