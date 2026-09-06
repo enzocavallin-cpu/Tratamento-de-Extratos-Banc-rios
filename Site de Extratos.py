@@ -1101,6 +1101,9 @@ def ce_cp(output_pdf):
         ['Data', 'Descrição', 'Valor', 'Rendimento', 'Natureza', 'Saldo', 'Natureza_Saldo']
     ]
 
+    savings_account['Descrição'] = savings_account['Descrição'].str.replace('Rendimento', 'Saldo Final')
+    savings_account = savings_account.reset_index()
+
     return savings_account
 
 #-----------------------------------------------------------------------------
