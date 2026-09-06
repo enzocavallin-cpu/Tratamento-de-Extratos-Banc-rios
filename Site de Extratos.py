@@ -742,10 +742,49 @@ def ce_cc(output_pdf):
     checking_account = checking_account[['Data', 'Documento', 'Descrição', 'Natureza', 'Valor', 'Saldo']]
    
     return checking_account
+
 #-----------------------------------------------------------------------------
-# Function to Create CE_CP from united pdf:
+# Function to Create CE_CP (Conta Poupança) from united pdf:
 #-----------------------------------------------------------------------------
-pattern_sihex = (
+# Os extratos de poupança da CAIXA aparecem em pelo menos dois formatos bem
+# diferentes:
+#
+#  1) "AUTO ATENDIMENTO" (terminal/caixa eletrônico): uma coluna só, com
+#     cabeçalho "DATA MOV NR.DOC HISTORICO T A X A V A L O R S A L D O"
+#     (letras espaçadas) e um campo extra de Taxa entre o Histórico e o
+#     Valor. Ex.:
+#     "13/05/2024 000000 DBPCV POUP 0,00000000 18.953,78 D 0,00 C"
+#
+#  2) "SIHEX" (Sistema de Histórico de Extratos): a página inteira é
+#     dividida em 2 colunas lado a lado, cada uma com vários blocos
+#     mensais ("Data Mov. Nr. Doc. Histórico Valor Saldo" + linhas do mês,
+#     ou "Conta sem movimentação no mês (MM/AA)..."). A extração de texto
+#     "normal" do pdfplumber embaralha as duas colunas porque lê linha a
+#     linha da página inteira; por isso aqui a página é recortada ao meio
+#     e cada metade é lida separadamente (esquerda, depois direita), o que
+#     reconstitui a ordem cronológica correta. Cada lançamento já vem com
+#     a data completa (dd/mm/aaaa), então, diferente do extrato de Fundo
+#     de Investimento (ce_if), não é preciso controlar "competência" à
+#     parte. Algumas linhas trazem só Valor (sem Saldo) — o Saldo é
+#     opcional no regex.
+#
+# Em ambos os formatos, quando a CAIXA detecta uma divergência de saldo,
+# ela reimprime o bloco inteiro do mês logo em seguida (precedido de
+# "Divergência de saldo..."), gerando uma repetição exata e consecutiva
+# dos mesmos lançamentos. Em vez de um drop_duplicates() no dataframe
+# inteiro (que apagaria por engano duas transações reais e distintas que,
+# por coincidência, tivessem a mesma data/valor), a função ignora um
+# lançamento apenas quando ele é IDÊNTICO ao lançamento imediatamente
+# anterior na ordem de leitura — o que captura exatamente esse tipo de
+# reimpressão sem arriscar remover lançamentos legítimos.
+def ce_cp(output_pdf):
+
+    # Linhas "SALDO ANTERIOR <valor><D|C>" (formato SIHEX) não têm data
+    # própria — são só o saldo de fechamento do bloco anterior repetido
+    # por conveniência. Não são incluídas como linha própria (evita datas
+    # inventadas); a mesma informação já aparece no "Saldo" do último
+    # lançamento do bloco anterior.
+    pattern_sihex = (
         r'(\d{2}/\d{2}/\d{4})\s+'          # Data
         r'(\d+)\s+'                         # Nr. Doc.
         r'([A-Za-zÀ-ÿ\s]+?)\s+'             # Histórico
@@ -859,19 +898,29 @@ pattern_sihex = (
 #-----------------------------------------------------------------------------
 def ce_if(output_pdf):
 
+    # No layout confirmado (extrato CEF de Fundo de Investimento), o campo
+    # "Mês/Ano" (ex.: 06/2020) fica no cabeçalho de cada página, ANTES do
+    # "Resumo da Movimentação" e da "Movimentação Detalhada" daquela mesma
+    # página — por isso a competência encontrada vale para tudo que vem
+    # depois dela, até o próximo marcador (modo "cabeçalho").
     pattern = (
     r'(\d{2}\s*\/\s*\d{2})\s+'
     r'([A-Za-zÀ-ÿ0-9\s\-\.\/\?]+?)\s+'
     r'([\d\.]+[\,\.]\d{2})\s*'
     r'(D|C)'
     )
+    # Dois grupos agora: mês (2 dígitos) e "/ano" — precisamos do mês para
+    # calcular o último dia da competência na linha de Rendimento Bruto.
     pattern_year = r'\s(\d{2})(\/\d{4})\s'
 
+    # "Resumo da Movimentação": linhas sem data própria (Rendimento Bruto no
+    # Mês e Saldo Bruto = saldo final do mês), tratadas à parte do `pattern`
+    # de transações porque não têm "dd/mm" no início da linha.
     pattern_rendimento = r'Rendimento\s+Bruto\s+no\s+M[eê]s\*?\s+([\d\.]+[\,\.]\d{2})\s*(D|C)'
     pattern_saldo_bruto = r'Saldo\s+Bruto\*?\s+([\d\.]+[\,\.]\d{2})\s*(D|C)'
 
     data = []
-    eventos_globais = []
+    eventos_globais = []  # (indice_pagina, posicao_no_texto, tipo, match)
 
     with pdfplumber.open(output_pdf) as pdf:
         for pagina_idx, page in enumerate(pdf.pages):
@@ -879,12 +928,23 @@ def ce_if(output_pdf):
             if not page_text:
                 continue
 
+            # Em vez de separar "transações" e "marcadores de competência"
+            # em listas próprias e depois tentar recombiná-las com
+            # bfill/ffill, juntamos todos os tipos de evento e ordenamos
+            # pela posição real (match.start()) em que aparecem no texto da
+            # página. Isso preserva a ordem de leitura do PDF, mesmo quando
+            # um marcador de competência cai no meio da página (virada de
+            # mês) ou quando o Resumo aparece antes da Movimentação
+            # Detalhada.
             for match in re.finditer(pattern, page_text):
                 eventos_globais.append((pagina_idx, match.start(), 'transacao', match))
 
             for match in re.finditer(pattern_year, page_text):
                 eventos_globais.append((pagina_idx, match.start(), 'competencia', match))
 
+            # O Resumo da Movimentação aparece uma vez por página/mês (na
+            # página em que a competência é aberta). Só criamos o evento
+            # quando as duas informações são encontradas juntas na página.
             match_rendimento = re.search(pattern_rendimento, page_text)
             match_saldo = re.search(pattern_saldo_bruto, page_text)
             if match_rendimento and match_saldo:
@@ -893,10 +953,17 @@ def ce_if(output_pdf):
                     (pagina_idx, posicao, 'resumo', (match_rendimento, match_saldo))
                 )
 
+    # Ordena por página e, dentro da página, pela posição no texto.
     eventos_globais.sort(key=lambda e: (e[0], e[1]))
 
-    competencia_mes = None
-    competencia_ano_sufixo = None
+    competencia_mes = None        # ex: "06"
+    competencia_ano_sufixo = None  # ex: "/2020"
+    # Guarda as competências (mês+ano) que já geraram a linha "Rendimento
+    # Bruto", para não duplicá-la quando o Resumo se repete em mais de uma
+    # página do mesmo mês (ex.: Folha 01/02 e 02/02). Isso é diferente de
+    # um drop_duplicates() no dataframe inteiro, que apagaria por engano
+    # duas transações reais e distintas que tivessem, por coincidência, a
+    # mesma data e o mesmo valor.
     competencias_com_resumo = set()
 
     for _, _, tipo, match in eventos_globais:
@@ -918,6 +985,9 @@ def ce_if(output_pdf):
         elif tipo == 'resumo':
             chave_competencia = (competencia_mes, competencia_ano_sufixo)
 
+            # Já existe uma linha "Rendimento Bruto" para essa competência
+            # (provavelmente o Resumo repetido em outra página do mesmo
+            # mês) — ignora este evento em vez de gerar uma linha repetida.
             if chave_competencia in competencias_com_resumo:
                 continue
 
@@ -939,7 +1009,7 @@ def ce_if(output_pdf):
             data.append({
                 "Data": data_resumo,
                 "Descrição": "Rendimento Bruto",
-                "Valor": match_saldo.group(1),
+                "Valor": match_saldo.group(1),      # saldo final do mês (Saldo Bruto)
                 "Natureza": match_saldo.group(2),
                 "Rendimento": valor_rendimento,
                 "Ano": competencia_ano_sufixo,
@@ -967,6 +1037,11 @@ def ce_if(output_pdf):
     investment_fund['Valor'] = investment_fund['Valor'].str.replace('.', '').str.replace(',', '.')
     investment_fund['Valor'] = pd.to_numeric(investment_fund['Valor'], errors='coerce')
 
+    # "Rendimento Bruto" já cai no último dia do mês por causa da Data
+    # calculada, mas se houver alguma transação real nesse mesmo dia,
+    # a ordenação por Data sozinha não garante quem vem primeiro (sort
+    # estável mantém a ordem de leitura do PDF). Esta prioridade força
+    # o "Rendimento Bruto" para o fim de cada dia/mês.
     investment_fund['prioridade_ordenacao'] = np.where(
         investment_fund['Descrição'] == 'Rendimento Bruto', 1, 0
     )
@@ -975,6 +1050,7 @@ def ce_if(output_pdf):
     )
     investment_fund = investment_fund.drop(columns=['prioridade_ordenacao'])
 
+    # Coloca a coluna "Rendimento" logo ao lado de "Valor".
     colunas = list(investment_fund.columns)
     colunas.remove('Rendimento')
     colunas.insert(colunas.index('Valor') + 1, 'Rendimento')
@@ -1223,9 +1299,3 @@ if st.session_state.step == 2:
                     "⚠️ O processamento foi executado, "
                     "mas não foram encontrados dados válidos."
                 )
-
-
-
-        
-        
-        
